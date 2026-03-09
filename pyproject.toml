@@ -7,7 +7,7 @@ name = "twingate-device-trust-bridge"
 version = "0.1.0"
 description = "Automatically trust devices in Twingate by cross-referencing MDM/EDR providers"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.27",

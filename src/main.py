@@ -14,6 +14,7 @@ Or via Docker:
 
 import asyncio
 import os
+import signal
 import sys
 
 from src.config import AppConfig, load_config
@@ -135,7 +136,48 @@ async def _run() -> None:
     providers = _build_providers(config)
     logger.info("Providers instantiated", count=len(providers), names=[p.name for p in providers])
 
-    await run_scheduler(config, providers)
+    # Register SIGTERM/SIGINT handlers so Docker stop / Kubernetes pod eviction
+    # triggers a clean shutdown instead of a hard kill.  The handlers cancel the
+    # current task which propagates an asyncio.CancelledError through the
+    # scheduler — its finally block logs "Scheduler stopped cleanly".
+    #
+    # On Windows, add_signal_handler raises NotImplementedError for SIGTERM
+    # (SIGINT is handled via KeyboardInterrupt in main() instead).
+    loop = asyncio.get_running_loop()
+    main_task = asyncio.current_task()
+
+    def _request_shutdown(sig_name: str) -> None:
+        logger.info("Shutdown signal received", signal=sig_name)
+        if main_task and not main_task.done():
+            main_task.cancel()
+
+    try:
+        loop.add_signal_handler(signal.SIGTERM, _request_shutdown, "SIGTERM")
+        loop.add_signal_handler(signal.SIGINT, _request_shutdown, "SIGINT")
+    except (NotImplementedError, ValueError):
+        pass  # Windows — SIGINT already handled via KeyboardInterrupt in main()
+
+    # Start optional health-check server (enabled by HEALTHZ_PORT env var).
+    healthz_task: asyncio.Task | None = None
+    healthz_port_str = os.environ.get("HEALTHZ_PORT")
+    if healthz_port_str:
+        try:
+            healthz_port = int(healthz_port_str)
+            from src.healthz import serve_healthz
+            healthz_task = asyncio.create_task(serve_healthz(healthz_port))
+            logger.info("Health-check server started", port=healthz_port)
+        except (ValueError, ImportError) as exc:
+            logger.warning("Could not start health-check server", error=str(exc))
+
+    try:
+        await run_scheduler(config, providers)
+    finally:
+        if healthz_task and not healthz_task.done():
+            healthz_task.cancel()
+            try:
+                await healthz_task
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 def main() -> None:
