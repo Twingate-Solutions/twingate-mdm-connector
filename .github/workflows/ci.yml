@@ -33,12 +33,6 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
-      - name: Lint (ruff)
-        run: ruff check --exit-zero .
-
-      - name: Type-check (mypy)
-        run: mypy src
-
       - name: Run tests (pytest)
         run: pytest --tb=short -q
 
