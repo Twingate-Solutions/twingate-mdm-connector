@@ -1,0 +1,146 @@
+# =============================================================================
+# twingate-device-trust-bridge — Configuration File
+# =============================================================================
+# Copy this file to config.yaml and adjust for your environment.
+#
+# ${VAR} placeholders are resolved from environment variables at startup.
+# This file should NOT contain raw secrets — use ${ENV_VAR} references or
+# set values directly in your .env file.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Twingate connection
+# -----------------------------------------------------------------------------
+twingate:
+  tenant: ${TWINGATE_TENANT}       # e.g. "mycompany" → mycompany.twingate.com
+  api_key: ${TWINGATE_API_KEY}
+
+# -----------------------------------------------------------------------------
+# Sync behaviour
+# -----------------------------------------------------------------------------
+sync:
+  interval_seconds: 300            # How often to run a full sync (seconds)
+  dry_run: false                   # true = log decisions only, no mutations
+  batch_size: 50                   # Twingate pagination batch size
+
+# -----------------------------------------------------------------------------
+# Device matching
+# -----------------------------------------------------------------------------
+matching:
+  primary_key: serial_number       # Only "serial_number" supported in v1
+  normalize: true                  # strip().upper() before comparison
+
+# -----------------------------------------------------------------------------
+# Trust evaluation
+# -----------------------------------------------------------------------------
+trust:
+  mode: any                        # "any" = trust if compliant in ANY provider
+                                   # "all" = trust only if compliant in ALL providers
+  require_online: true             # Device must be online in the provider
+  require_compliant: true          # Device must pass provider compliance checks
+  max_days_since_checkin: 7        # Reject devices not seen in N days
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  level: INFO                      # DEBUG | INFO | WARNING | ERROR
+  format: json                     # "json" (stdout) — only option in v1
+
+# -----------------------------------------------------------------------------
+# Providers
+#
+# List one entry per provider. Set enabled: true to activate.
+# All secrets must use ${ENV_VAR} references.
+# -----------------------------------------------------------------------------
+providers:
+
+  # ---------------------------------------------------------------------------
+  # NinjaOne (NinjaRMM)
+  # Auth: OAuth2 Client Credentials
+  # Regions: us (app), eu, ca, au, oc
+  # ---------------------------------------------------------------------------
+  - type: ninjaone
+    enabled: false
+    region: us                     # us | eu | ca | au | oc
+    client_id: ${NINJAONE_CLIENT_ID}
+    client_secret: ${NINJAONE_CLIENT_SECRET}
+
+  # ---------------------------------------------------------------------------
+  # Sophos Central
+  # Auth: OAuth2 Client Credentials + /whoami/v1 tenant discovery
+  # ---------------------------------------------------------------------------
+  - type: sophos
+    enabled: false
+    client_id: ${SOPHOS_CLIENT_ID}
+    client_secret: ${SOPHOS_CLIENT_SECRET}
+
+  # ---------------------------------------------------------------------------
+  # ManageEngine Endpoint Central — on-prem variant
+  # Auth: API token
+  # ---------------------------------------------------------------------------
+  - type: manageengine
+    enabled: false
+    variant: onprem                # "onprem" or "cloud"
+    base_url: https://uems.company.com:8020
+    api_token: ${MANAGEENGINE_API_TOKEN}
+
+  # ---------------------------------------------------------------------------
+  # ManageEngine Endpoint Central — cloud variant (uncomment to use)
+  # Auth: OAuth2 via Zoho
+  # ---------------------------------------------------------------------------
+  # - type: manageengine
+  #   enabled: false
+  #   variant: cloud
+  #   base_url: https://endpointcentral.manageengine.com
+  #   oauth_client_id: ${MANAGEENGINE_OAUTH_CLIENT_ID}
+  #   oauth_client_secret: ${MANAGEENGINE_OAUTH_CLIENT_SECRET}
+  #   oauth_refresh_token: ${MANAGEENGINE_OAUTH_REFRESH_TOKEN}
+
+  # ---------------------------------------------------------------------------
+  # Automox
+  # Auth: API key Bearer token
+  # ---------------------------------------------------------------------------
+  - type: automox
+    enabled: false
+    org_id: "12345"                # Your Automox organisation ID
+    api_key: ${AUTOMOX_API_KEY}
+
+  # ---------------------------------------------------------------------------
+  # JumpCloud
+  # Auth: x-api-key header
+  # ---------------------------------------------------------------------------
+  - type: jumpcloud
+    enabled: false
+    api_key: ${JUMPCLOUD_API_KEY}
+
+  # ---------------------------------------------------------------------------
+  # FleetDM
+  # Auth: Bearer token
+  # ---------------------------------------------------------------------------
+  - type: fleetdm
+    enabled: false
+    url: https://fleet.company.com # Your Fleet server URL (no trailing slash)
+    api_token: ${FLEETDM_API_TOKEN}
+
+  # ---------------------------------------------------------------------------
+  # Mosyle (Apple MDM — macOS, iOS, iPadOS only)
+  # Auth: access token + email + password in request body
+  # ---------------------------------------------------------------------------
+  - type: mosyle
+    enabled: false
+    is_business: false             # true = Mosyle Business; false = Mosyle Manager
+    access_token: ${MOSYLE_ACCESS_TOKEN}
+    email: ${MOSYLE_EMAIL}
+    password: ${MOSYLE_PASSWORD}
+
+  # ---------------------------------------------------------------------------
+  # Datto RMM
+  # Auth: OAuth2 (api_key + api_secret → Bearer token, expires 100h)
+  # Regions: pinotage | merlot | concord | vidal | syrah | zinfandel
+  # ---------------------------------------------------------------------------
+  - type: datto
+    enabled: false
+    api_url: https://pinotage-api.centrastage.net  # Replace with your region
+    api_key: ${DATTO_API_KEY}
+    api_secret: ${DATTO_API_SECRET}

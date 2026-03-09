@@ -1,0 +1,9 @@
+services:
+  device-trust-bridge:
+    build: .
+    # Load secrets from .env (never commit this file)
+    env_file: .env
+    volumes:
+      # Mount your config.yaml into the container (read-only)
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
