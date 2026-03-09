@@ -106,8 +106,13 @@ def test_is_device_recent_within_window() -> None:
 
 
 def test_is_device_recent_exactly_at_boundary() -> None:
-    # 7 days ago exactly — should be recent (>= cutoff)
-    device = _device_seen_days_ago(7)
+    # One second inside the 7-day window.  Testing exact equality against a
+    # live clock is a race condition — the cutoff advances between device
+    # creation and the function call, so we use a small buffer instead.
+    device = ProviderDevice(
+        serial_number="X",
+        last_seen=datetime.now(tz=UTC) - timedelta(days=7) + timedelta(seconds=1),
+    )
     assert is_device_recent(device, max_days=7) is True
 
 
