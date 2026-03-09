@@ -1,2 +1,30 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalise all text files to LF in the repository.
+# On Windows checkouts, Git will convert to CRLF locally (if core.autocrlf
+# is set), but the Docker container will always see LF line endings.
+
+* text=auto eol=lf
+
+# Explicitly LF — source files that must be LF inside the container
+*.py    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.toml  text eol=lf
+*.cfg   text eol=lf
+*.ini   text eol=lf
+*.sh    text eol=lf
+*.env   text eol=lf
+Dockerfile text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Binary — never touch line endings
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.gz    binary
+*.zip   binary
+*.whl   binary
