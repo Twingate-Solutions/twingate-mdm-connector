@@ -6,14 +6,24 @@ on:
   pull_request:
     branches: ["main"]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: twingate-solutions/twingate-mdm-connector
+
 jobs:
-  test:
-    name: Lint, type-check & test
+  ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push git version tags
+      packages: write   # push to GHCR and delete old versions
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required to list existing version tags
 
+      # ── Python tests ────────────────────────────────────────────────────────
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -31,3 +41,84 @@ jobs:
 
       - name: Run tests (pytest)
         run: pytest --tb=short -q
+
+      # ── Version tag (main branch only) ─────────────────────────────────────
+      # Finds the latest 1.XX git tag and increments the minor number.
+      # First run produces 1.00; subsequent runs: 1.00 → 1.01 → 1.02 …
+      - name: Compute next version
+        if: github.event_name != 'pull_request'
+        id: version
+        run: |
+          latest=$(git tag -l '1.*' | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            next="1.00"
+          else
+            minor=$(echo "$latest" | cut -d. -f2)
+            next="1.$(printf '%02d' $((10#$minor + 1)))"
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "Next version: $next"
+
+      - name: Push version tag
+        if: github.event_name != 'pull_request'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+      # ── Docker build ────────────────────────────────────────────────────────
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # PR: build only (validates the Dockerfile, no push)
+      - name: Build (PR — no push)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # main: build and push with version + latest tags
+      - name: Build and push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          provenance: false
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Cleanup: keep only the last 3 package versions ─────────────────────
+      # Each push creates one versioned package (the multi-arch manifest list).
+      # delete-package-versions removes the oldest when > 3 exist.
+      - name: Delete old package versions
+        if: github.event_name != 'pull_request'
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: twingate-mdm-connector
+          package-type: container
+          min-versions-to-keep: 3
+          delete-only-untagged-versions: false
+          token: ${{ secrets.GITHUB_TOKEN }}
