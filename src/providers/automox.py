@@ -10,7 +10,7 @@ Pagination: 0-indexed ``page`` + ``limit`` (max 500). Loop until a page
 Compliance: ``is_compatible`` flag + ``pending_patches == 0``.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 import structlog
 

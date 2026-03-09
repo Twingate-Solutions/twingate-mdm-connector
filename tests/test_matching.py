@@ -2,8 +2,6 @@
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
 from src.matching import (
     build_provider_index,
     evaluate_trust,

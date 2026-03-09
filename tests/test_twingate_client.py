@@ -168,7 +168,9 @@ async def test_trust_device_mutation_returns_ok_false() -> None:
 async def test_trust_device_http_error_propagates() -> None:
     with patch(
         "src.twingate.client.request_with_retry",
-        new=AsyncMock(side_effect=httpx.HTTPStatusError("503", request=MagicMock(), response=MagicMock())),
+        new=AsyncMock(
+            side_effect=httpx.HTTPStatusError("503", request=MagicMock(), response=MagicMock())
+        ),
     ):
         async with TwingateClient("tenant", "key") as client:
             with pytest.raises(httpx.HTTPStatusError):

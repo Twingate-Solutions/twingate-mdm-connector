@@ -120,7 +120,10 @@ async def run_sync_cycle(
     try:
         untrusted = await tg_client.list_untrusted_devices()
     except Exception as exc:
-        logger.error("Failed to fetch untrusted devices from Twingate — aborting cycle", error=str(exc))
+        logger.error(
+            "Failed to fetch untrusted devices from Twingate — aborting cycle",
+            error=str(exc),
+        )
         return summary
 
     summary.total_untrusted = len(untrusted)
@@ -217,7 +220,11 @@ async def _process_device(
             device_serial=serial,
             device_name=tg_device.name,
             provider_results={
-                k: {"found": v is not None, "online": v.is_online if v else None, "compliant": v.is_compliant if v else None}
+                k: {
+                    "found": v is not None,
+                    "online": v.is_online if v else None,
+                    "compliant": v.is_compliant if v else None,
+                }
                 for k, v in provider_results.items()
             },
         )

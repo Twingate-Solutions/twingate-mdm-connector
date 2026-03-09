@@ -39,7 +39,7 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
     try:
         # Drain the request line + headers without parsing them.
         await asyncio.wait_for(reader.read(4096), timeout=5.0)
-    except (asyncio.TimeoutError, ConnectionResetError):
+    except (TimeoutError, ConnectionResetError):
         pass
     finally:
         try:
