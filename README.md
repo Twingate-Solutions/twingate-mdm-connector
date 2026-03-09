@@ -1,4 +1,4 @@
-# twingate-device-trust-bridge
+# Twingate MDM Connector
 
 Automatically trust devices in [Twingate](https://www.twingate.com/) by cross-referencing your MDM/EDR providers. Runs as a lightweight Docker container, requires no database, and never untrusts a device.
 
