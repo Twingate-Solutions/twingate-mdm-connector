@@ -2,7 +2,7 @@
 
 Provides two operations:
 - :meth:`TwingateClient.list_untrusted_devices` — exhaustively paginates through
-  all devices where ``isTrusted == false``.
+  all devices where ``isTrusted == false`` and ``activeState == ACTIVE``.
 - :meth:`TwingateClient.trust_device` — calls the ``deviceUpdate`` mutation to
   mark a device as trusted.
 
@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 _QUERY_UNTRUSTED_DEVICES = """
 query GetUntrustedDevices($after: String, $first: Int) {
   devices(
-    filter: { isTrusted: { eq: false } }
+    filter: { isTrusted: { eq: false }, activeState: { in: [ACTIVE] } }
     after: $after
     first: $first
   ) {
