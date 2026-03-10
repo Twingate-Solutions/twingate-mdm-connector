@@ -142,15 +142,13 @@ pip install -e ".[dev]"
 
 # Run tests
 pytest
-
-# Lint
-ruff check .
-
-# Type-check
-mypy src
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide, and [docs/adding-a-provider.md](docs/adding-a-provider.md) to learn how to add a new MDM/EDR provider.
+
+## Testing
+
+See [docs/testing/overview.md](docs/testing/overview.md) for the end-to-end testing guide, which covers obtaining provider credentials, setting up a Windows test VM, and validating the full trust flow.
 
 ## License
 

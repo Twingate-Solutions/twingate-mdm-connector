@@ -66,7 +66,7 @@ class NinjaOneConfig(BaseModel):
 
     type: Literal["ninjaone"]
     enabled: bool = False
-    region: str = "us"
+    region: str = "app"
     client_id: str
     client_secret: str
 

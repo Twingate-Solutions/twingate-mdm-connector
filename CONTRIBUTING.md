@@ -20,9 +20,9 @@ All tests mock HTTP — no real MDM credentials are required.
 
 ## Code style
 
-- **Formatter / linter:** [ruff](https://docs.astral.sh/ruff/) — run `ruff check .` before committing.
-- **Type checker:** [mypy](https://mypy.readthedocs.io/) in strict mode — run `mypy src`.
 - Python 3.12+ syntax is fine (match statements, `X | Y` union types, etc.).
+- Async throughout — `async def`, `httpx.AsyncClient`, `asyncio.gather` for parallel provider queries.
+- Type hints on every function signature.
 
 ## Adding a new provider
 
@@ -31,9 +31,7 @@ See [docs/adding-a-provider.md](docs/adding-a-provider.md) for a step-by-step gu
 ## Pull request checklist
 
 - [ ] All existing tests pass (`pytest`)
-- [ ] New code is covered by tests (mock HTTP calls with `unittest.mock`)
-- [ ] `ruff check .` reports no errors
-- [ ] `mypy src` reports no errors
+- [ ] New code is covered by tests (mock HTTP calls with `respx`)
 - [ ] New provider includes a setup doc in `docs/providers/`
 
 ## Design constraints
