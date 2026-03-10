@@ -64,7 +64,33 @@ Each step is labelled:
 
 ---
 
-## Phase 3: Configuration
+## Phase 3: Twingate API Pre-verification
+
+Verify the Twingate API key works end-to-end — including the trust mutation — before introducing any provider complexity. This makes it much easier to isolate failures later.
+
+- [ ] **[Claude Code can help]** List all untrusted active devices via the API:
+  ```bash
+  python scripts/test-twingate-client.py \
+    --tenant your-tenant \
+    --api-key $TWINGATE_API_KEY
+  ```
+  > Verify by: script prints the device list and the test VM appears with `"active_state": "ACTIVE"` and a non-null `serial_number`. If `serial_number` is `null`, the bridge will not be able to match this device.
+
+- [ ] **[Claude Code can help]** Verify the trust mutation works by trusting the device directly:
+  ```bash
+  python scripts/test-trust-mutation.py \
+    --tenant your-tenant \
+    --api-key $TWINGATE_API_KEY \
+    --serial "YOUR-SERIAL-HERE"
+  ```
+  > Verify by: script prints `PASS: '...' is now isTrusted=True`. Then check the Twingate Admin Console — the device should show **Security: Device instance verified**.
+
+- [ ] **[You do this]** Manually untrust the device in the Admin Console before continuing: Devices > click device > Actions > **Remove Trust**.
+  > Verify by: device shows Trust Status: Untrusted again.
+
+---
+
+## Phase 4: Configuration
 
 - [ ] **[You do this]** Create a `config.yaml` based on `config.yaml.example`. Minimum required fields: `twingate.tenant`, `twingate.api_key`, and at least one enabled provider. See [local-run.md](local-run.md) or [docker-run.md](docker-run.md) for a minimal example.
   > Verify by: file exists and all `${VAR}` references have corresponding environment variables set.
@@ -86,7 +112,7 @@ Each step is labelled:
 
 ---
 
-## Phase 4: Dry Run
+## Phase 5: Dry Run
 
 - [ ] **[You do this]** Confirm `dry_run: true` is set in `config.yaml`.
 
@@ -105,7 +131,7 @@ Each step is labelled:
 
 ---
 
-## Phase 5: Live Run
+## Phase 6: Live Run
 
 - [ ] **[You do this]** Change `dry_run: true` to `dry_run: false` in `config.yaml`. Restart the bridge.
 
@@ -129,7 +155,7 @@ Each step is labelled:
 
 ---
 
-## Phase 6: Reset and Re-test (optional)
+## Phase 7: Reset and Re-test (optional)
 
 - [ ] **[You do this]** Remove trust from the device in the Admin Console: Devices > click device > Actions > **Remove Trust**.
   > Verify by: device shows Trust Status: Untrusted again.
