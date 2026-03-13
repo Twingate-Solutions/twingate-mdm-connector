@@ -54,6 +54,7 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
         ManageEngineConfig,
         MosyleConfig,
         NinjaOneConfig,
+        RipplingConfig,
         SophosConfig,
     )
 
@@ -92,6 +93,10 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
             case DattoConfig():
                 from src.providers.datto import DattoProvider
                 plugins.append(DattoProvider(provider_config))
+
+            case RipplingConfig():
+                from src.providers.rippling import RipplingProvider
+                plugins.append(RipplingProvider(provider_config))
 
     return plugins
 

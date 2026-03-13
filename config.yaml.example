@@ -144,3 +144,12 @@ providers:
     api_url: https://pinotage-api.centrastage.net  # Replace with your region
     api_key: ${DATTO_API_KEY}
     api_secret: ${DATTO_API_SECRET}
+
+  # ---------------------------------------------------------------------------
+  # Rippling (HR/IT platform — requires IT Management add-on)
+  # Auth: OAuth2 Client Credentials
+  # ---------------------------------------------------------------------------
+  - type: rippling
+    enabled: false
+    client_id: ${RIPPLING_CLIENT_ID}
+    client_secret: ${RIPPLING_CLIENT_SECRET}

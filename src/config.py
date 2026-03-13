@@ -164,6 +164,15 @@ class DattoConfig(BaseModel):
     api_secret: str
 
 
+class RipplingConfig(BaseModel):
+    """Rippling HR/IT platform provider configuration."""
+
+    type: Literal["rippling"]
+    enabled: bool = False
+    client_id: str
+    client_secret: str
+
+
 # Discriminated union of all provider config types
 ProviderConfig = Annotated[
     NinjaOneConfig
@@ -173,7 +182,8 @@ ProviderConfig = Annotated[
     | JumpCloudConfig
     | FleetDMConfig
     | MosyleConfig
-    | DattoConfig,
+    | DattoConfig
+    | RipplingConfig,
     Field(discriminator="type"),
 ]
 

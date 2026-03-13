@@ -1,6 +1,6 @@
 # Configuration Reference
 
-The bridge is configured via a YAML file (default: `config.yaml` in the working directory) combined with environment variables for secrets. The config file path can be overridden with the `CONFIG_FILE` environment variable.
+The bridge is configured via a YAML file combined with environment variables for secrets. By default the bridge looks for `config.yaml` in the working directory. Override this with the `CONFIG_FILE` environment variable (e.g. `CONFIG_FILE=/etc/connector/config.yaml`).
 
 ## Environment variable interpolation
 
@@ -293,6 +293,24 @@ Apple devices only (macOS, iOS, iPadOS).
 
 ---
 
+### `rippling`
+
+| Key | Type | Required | Default | Description |
+| --- | ---- | -------- | ------- | ----------- |
+| `type` | `"rippling"` | Yes | — | Provider type identifier |
+| `enabled` | bool | No | `false` | Enable this provider |
+| `client_id` | string | Yes | — | OAuth2 client ID |
+| `client_secret` | string | Yes | — | OAuth2 client secret |
+
+```yaml
+- type: rippling
+  enabled: true
+  client_id: ${RIPPLING_CLIENT_ID}
+  client_secret: ${RIPPLING_CLIENT_SECRET}
+```
+
+---
+
 ## Health check
 
 The bridge can expose a minimal TCP liveness endpoint. Set the `HEALTHZ_PORT` environment variable (not a config file setting) to enable it:
@@ -375,4 +393,9 @@ providers:
     api_url: https://pinotage-api.centrastage.net
     api_key: ${DATTO_API_KEY}
     api_secret: ${DATTO_API_SECRET}
+
+  - type: rippling
+    enabled: false
+    client_id: ${RIPPLING_CLIENT_ID}
+    client_secret: ${RIPPLING_CLIENT_SECRET}
 ```
