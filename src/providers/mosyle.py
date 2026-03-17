@@ -28,6 +28,7 @@ _BUSINESS_BASE = "https://businessapi.mosyle.com/v2"
 
 # OS types to query; Mosyle separates macOS from iOS/iPadOS
 _OS_TYPES = ("osx", "ios")
+_MAX_PAGES = 500
 
 
 class MosyleProvider(ProviderPlugin):
@@ -86,7 +87,7 @@ class MosyleProvider(ProviderPlugin):
 
         for os_type in _OS_TYPES:
             page = 1
-            while True:
+            for _page_num in range(_MAX_PAGES):
                 body = {
                     **self._auth_body(),
                     "options": {"os": os_type, "page": page},
@@ -117,6 +118,13 @@ class MosyleProvider(ProviderPlugin):
                         )
 
                 page += 1
+            else:
+                log.warning(
+                    "Mosyle pagination safety limit reached — results may be incomplete",
+                    provider=self.name,
+                    os_type=os_type,
+                    max_pages=_MAX_PAGES,
+                )
 
         log.info("Mosyle devices fetched", provider=self.name, count=len(devices))
         return devices

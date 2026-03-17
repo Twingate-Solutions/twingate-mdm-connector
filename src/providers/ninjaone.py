@@ -26,6 +26,7 @@ _REGION_BASES: dict[str, str] = {
 }
 
 _PAGE_SIZE = 200
+_MAX_PAGES = 500
 
 # AV threat statuses that indicate a clean device
 _CLEAN_THREAT_STATUSES = frozenset({"GOOD", "PROTECTED", "NOT_RUNNING", ""})
@@ -109,7 +110,7 @@ class NinjaOneProvider(ProviderPlugin):
         cursor: str | None = None
         headers = {"Authorization": f"Bearer {self._token_cache.token}"}
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             params: dict[str, str | int] = {"pageSize": _PAGE_SIZE}
             if cursor:
                 params["after"] = cursor
@@ -146,6 +147,12 @@ class NinjaOneProvider(ProviderPlugin):
             if last_id is None:
                 break
             cursor = str(last_id)
+        else:
+            log.warning(
+                "NinjaOne pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         log.info("NinjaOne devices fetched", provider=self.name, count=len(devices))
         return devices

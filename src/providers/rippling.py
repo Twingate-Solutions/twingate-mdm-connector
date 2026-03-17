@@ -21,6 +21,7 @@ Online status:   Derived from ``managementStatus`` — a device is considered
 """
 
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 import structlog
 
@@ -33,9 +34,11 @@ log = structlog.get_logger()
 _BASE_URL = "https://api.rippling.com"
 _TOKEN_URL = f"{_BASE_URL}/api/o/token/"
 _DEVICES_URL = f"{_BASE_URL}/platform/api/devices"
+_EXPECTED_HOST = "api.rippling.com"
 
 # managementStatus values that indicate a healthy, actively-managed device
 _ACTIVE_STATUSES = frozenset({"ACTIVE", "MANAGED"})
+_MAX_PAGES = 500
 
 
 class RipplingProvider(ProviderPlugin):
@@ -106,8 +109,23 @@ class RipplingProvider(ProviderPlugin):
         devices: list[ProviderDevice] = []
         headers = {"Authorization": f"Bearer {self._token_cache.token}"}
         next_url: str | None = _DEVICES_URL
+        page_count = 0
 
         while next_url:
+            page_count += 1
+            if page_count > _MAX_PAGES:
+                log.warning(
+                    "Rippling pagination safety limit reached — results may be incomplete",
+                    provider=self.name,
+                    max_pages=_MAX_PAGES,
+                )
+                break
+            parsed_host = urlparse(next_url).hostname or ""
+            if parsed_host != _EXPECTED_HOST:
+                raise ValueError(
+                    f"Rippling pagination URL has unexpected host "
+                    f"{parsed_host!r} (expected {_EXPECTED_HOST!r})"
+                )
             response = await request_with_retry(
                 self._client,
                 "GET",

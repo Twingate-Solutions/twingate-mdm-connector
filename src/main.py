@@ -108,7 +108,7 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
 
 async def _run() -> None:
     """Main coroutine — loads config, builds providers, starts scheduler."""
-    config_path = os.environ.get("CONFIG_PATH", "config.yaml")
+    config_path = os.environ.get("CONFIG_FILE", "config.yaml")
 
     # Load config first so we can configure logging at the right level.
     try:

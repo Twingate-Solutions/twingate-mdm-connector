@@ -22,6 +22,7 @@ log = structlog.get_logger()
 _TOKEN_URL = "https://id.sophos.com/api/v2/oauth2/token"
 _WHOAMI_URL = "https://api.central.sophos.com/whoami/v1"
 _PAGE_SIZE = 500
+_MAX_PAGES = 500
 
 
 class SophosProvider(ProviderPlugin):
@@ -135,7 +136,7 @@ class SophosProvider(ProviderPlugin):
             "X-Tenant-ID": self._tenant_id,
         }
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             params: dict[str, str | int] = {"pageSize": _PAGE_SIZE}
             if next_key:
                 params["pageFromKey"] = next_key
@@ -165,6 +166,12 @@ class SophosProvider(ProviderPlugin):
             next_key = (data.get("pages") or {}).get("nextKey")
             if not next_key:
                 break
+        else:
+            log.warning(
+                "Sophos pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         log.info("Sophos endpoints fetched", provider=self.name, count=len(devices))
         return devices

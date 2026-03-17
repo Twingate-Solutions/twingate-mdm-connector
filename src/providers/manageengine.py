@@ -31,6 +31,7 @@ log = structlog.get_logger()
 _ZOHO_TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
 _CLOUD_BASE_URL = "https://endpointcentral.manageengine.com"
 _PAGE_LIMIT = 200
+_MAX_PAGES = 500
 
 # Managed-status values that indicate an active/healthy agent
 _ACTIVE_STATUSES = frozenset({"ACTIVE", "MANAGED"})
@@ -149,7 +150,7 @@ class ManageEngineProvider(ProviderPlugin):
         computers: list[dict] = []
         page = 1
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             response = await request_with_retry(
                 self._client,
                 "GET",
@@ -169,6 +170,12 @@ class ManageEngineProvider(ProviderPlugin):
             if len(page_computers) < _PAGE_LIMIT or (total and len(computers) >= total):
                 break
             page += 1
+        else:
+            log.warning(
+                "ManageEngine computers pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         return computers
 
@@ -179,7 +186,7 @@ class ManageEngineProvider(ProviderPlugin):
         serials: dict[str, str] = {}
         page = 1
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             response = await request_with_retry(
                 self._client,
                 "GET",
@@ -212,6 +219,12 @@ class ManageEngineProvider(ProviderPlugin):
             if len(comp_details) < _PAGE_LIMIT or (total and len(serials) >= total):
                 break
             page += 1
+        else:
+            log.warning(
+                "ManageEngine inventory pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         return serials
 

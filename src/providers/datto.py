@@ -16,6 +16,7 @@ Rate limit:  600 reads/min; on 429 wait 60 s (handled by request_with_retry).
 """
 
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 import structlog
 
@@ -28,6 +29,7 @@ log = structlog.get_logger()
 # Patch / AV status values that indicate a compliant device
 _GOOD_PATCH_STATUSES = frozenset({"FULLY_PATCHED", "NOT_SUPPORTED", "UP_TO_DATE"})
 _GOOD_AV_STATUSES = frozenset({"PROTECTED", "NOT_APPLICABLE", "NONE"})
+_MAX_PAGES = 500
 
 
 class DattoProvider(ProviderPlugin):
@@ -58,6 +60,7 @@ class DattoProvider(ProviderPlugin):
         self._token_cache = TokenCache()
         base_url = config.api_url.rstrip("/")
         self._base_url = base_url
+        self._expected_host = urlparse(base_url).hostname or ""
         self._token_url = f"{base_url}/auth/oauth/token"
         self._client = build_client(base_url=base_url)
 
@@ -108,8 +111,23 @@ class DattoProvider(ProviderPlugin):
         devices: list[ProviderDevice] = []
         headers = {"Authorization": f"Bearer {self._token_cache.token}"}
         next_url: str | None = f"{self._base_url}/api/v2/account/devices"
+        page_count = 0
 
         while next_url:
+            page_count += 1
+            if page_count > _MAX_PAGES:
+                log.warning(
+                    "Datto pagination safety limit reached — results may be incomplete",
+                    provider=self.name,
+                    max_pages=_MAX_PAGES,
+                )
+                break
+            parsed_host = urlparse(next_url).hostname or ""
+            if parsed_host != self._expected_host:
+                raise ValueError(
+                    f"Datto pagination URL has unexpected host "
+                    f"{parsed_host!r} (expected {self._expected_host!r})"
+                )
             response = await request_with_retry(
                 self._client,
                 "GET",

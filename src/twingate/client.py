@@ -24,6 +24,12 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
+# Pagination safety limit
+# ---------------------------------------------------------------------------
+
+_MAX_PAGES = 500
+
+# ---------------------------------------------------------------------------
 # GraphQL query and mutation strings
 # ---------------------------------------------------------------------------
 
@@ -133,7 +139,7 @@ class TwingateClient:
         devices: list[TwingateDevice] = []
         cursor: str | None = None
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             variables: dict[str, Any] = {"first": self._batch_size}
             if cursor:
                 variables["after"] = cursor
@@ -155,6 +161,11 @@ class TwingateClient:
                 break
 
             cursor = connection.page_info.end_cursor
+        else:
+            logger.warning(
+                "Twingate pagination safety limit reached — results may be incomplete",
+                max_pages=_MAX_PAGES,
+            )
 
         logger.info(
             "Fetched untrusted devices from Twingate",

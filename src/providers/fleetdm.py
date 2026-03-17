@@ -25,6 +25,7 @@ log = structlog.get_logger()
 
 _PER_PAGE = 500
 _DETAIL_CONCURRENCY = 20  # max simultaneous host-detail calls
+_MAX_PAGES = 500
 
 
 class FleetDMProvider(ProviderPlugin):
@@ -51,10 +52,7 @@ class FleetDMProvider(ProviderPlugin):
         """
         self._config = config
         base_url = config.url.rstrip("/")
-        self._client = build_client(
-            base_url=base_url,
-            headers={"Authorization": f"Bearer {config.api_token}"},
-        )
+        self._client = build_client(base_url=base_url)
 
     async def authenticate(self) -> None:
         """No-op — FleetDM uses a static API token set at initialisation time."""
@@ -80,12 +78,14 @@ class FleetDMProvider(ProviderPlugin):
         # Phase 1: collect host summaries
         hosts: list[dict] = []
         page = 1
+        auth_headers = {"Authorization": f"Bearer {self._config.api_token}"}
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             response = await request_with_retry(
                 self._client,
                 "GET",
                 "/api/v1/fleet/hosts",
+                headers=auth_headers,
                 params={"per_page": _PER_PAGE, "page": page},
             )
             response.raise_for_status()
@@ -97,6 +97,12 @@ class FleetDMProvider(ProviderPlugin):
             if not (data.get("meta") or {}).get("has_next_results", False):
                 break
             page += 1
+        else:
+            log.warning(
+                "FleetDM pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         if not hosts:
             log.info("FleetDM hosts fetched", provider=self.name, count=0)
@@ -112,6 +118,7 @@ class FleetDMProvider(ProviderPlugin):
                         self._client,
                         "GET",
                         f"/api/v1/fleet/hosts/{host['id']}",
+                        headers=auth_headers,
                     )
                     resp.raise_for_status()
                     return resp.json().get("host") or host

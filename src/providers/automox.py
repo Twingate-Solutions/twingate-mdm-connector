@@ -22,6 +22,7 @@ log = structlog.get_logger()
 
 _API_BASE = "https://console.automox.com/api"
 _PAGE_LIMIT = 500
+_MAX_PAGES = 500
 
 
 class AutomoxProvider(ProviderPlugin):
@@ -47,10 +48,7 @@ class AutomoxProvider(ProviderPlugin):
             config: Automox configuration from YAML / env.
         """
         self._config = config
-        self._client = build_client(
-            base_url=_API_BASE,
-            headers={"Authorization": f"Bearer {config.api_key}"},
-        )
+        self._client = build_client(base_url=_API_BASE)
 
     async def authenticate(self) -> None:
         """No-op — Automox uses a static API key set at initialisation time."""
@@ -71,12 +69,14 @@ class AutomoxProvider(ProviderPlugin):
         """
         devices: list[ProviderDevice] = []
         page = 0
+        auth_headers = {"Authorization": f"Bearer {self._config.api_key}"}
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             response = await request_with_retry(
                 self._client,
                 "GET",
                 "/servers",
+                headers=auth_headers,
                 params={
                     "o": self._config.org_id,
                     "page": page,
@@ -104,6 +104,12 @@ class AutomoxProvider(ProviderPlugin):
             if len(results) < _PAGE_LIMIT:
                 break
             page += 1
+        else:
+            log.warning(
+                "Automox pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         log.info("Automox servers fetched", provider=self.name, count=len(devices))
         return devices

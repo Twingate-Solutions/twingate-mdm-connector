@@ -33,6 +33,12 @@ def configure_logging(level: str = "INFO") -> None:
         level=log_level,
     )
 
+    # Pin httpx/httpcore to WARNING regardless of app log level so that
+    # request bodies (which may contain credentials, e.g. Mosyle) are never
+    # emitted to the log stream.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     structlog.configure(
         processors=[
             # Inject log level and logger name into the event dict.

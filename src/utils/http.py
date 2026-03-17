@@ -65,7 +65,7 @@ def build_client(
         base_url=base_url,
         headers=headers or {},
         timeout=timeout,
-        follow_redirects=True,
+        follow_redirects=False,
     )
 
 
