@@ -19,6 +19,7 @@ log = structlog.get_logger()
 # Regional API base URLs
 _REGION_BASES: dict[str, str] = {
     "app": "https://app.ninjarmm.com",
+    "api": "https://api.ninjarmm.com",
     "eu": "https://eu.ninjarmm.com",
     "ca": "https://ca.ninjarmm.com",
     "au": "https://au.ninjarmm.com",
@@ -66,7 +67,7 @@ class NinjaOneProvider(ProviderPlugin):
     async def authenticate(self) -> None:
         """Obtain or refresh the OAuth2 access token.
 
-        Uses the client credentials flow with scope ``monitoring management``.
+        Uses the client credentials flow with scope ``monitoring``.
         The token is cached and refreshed proactively 60 s before expiry.
 
         Raises:
@@ -84,7 +85,7 @@ class NinjaOneProvider(ProviderPlugin):
                 "grant_type": "client_credentials",
                 "client_id": self._config.client_id,
                 "client_secret": self._config.client_secret,
-                "scope": "monitoring management",
+                "scope": "monitoring",
             },
         )
         response.raise_for_status()
@@ -193,6 +194,8 @@ class NinjaOneProvider(ProviderPlugin):
         system = device.get("system") or {}
         serial_raw: str = (
             system.get("serialNumber")
+            or system.get("biosSerialNumber")
+            or system.get("assetSerialNumber")
             or device.get("systemSerialNumber")
             or ""
         )
