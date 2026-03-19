@@ -24,8 +24,10 @@ def _make_onprem_config(base_url: str = "https://me.corp.local") -> ManageEngine
     )
 
 
-def _make_cloud_config() -> ManageEngineConfig:
-    return ManageEngineConfig(
+def _make_cloud_config(**compliance_kwargs) -> ManageEngineConfig:
+    from src.config import ManageEngineCloudComplianceConfig
+
+    kwargs: dict = dict(
         type="manageengine",
         enabled=True,
         variant="cloud",
@@ -33,6 +35,9 @@ def _make_cloud_config() -> ManageEngineConfig:
         oauth_client_secret="zoho-client-secret",
         oauth_refresh_token="zoho-refresh-token",
     )
+    if compliance_kwargs:
+        kwargs["compliance"] = ManageEngineCloudComplianceConfig(**compliance_kwargs)
+    return ManageEngineConfig(**kwargs)
 
 
 def _make_response(body: object, status_code: int = 200) -> MagicMock:
@@ -352,6 +357,197 @@ def test_cloud_defaults_to_cloud_base_url() -> None:
 
     provider = ManageEngineProvider(_make_cloud_config())
     assert provider._base_url == _CLOUD_BASE_URL.rstrip("/")
+
+
+# ---------------------------------------------------------------------------
+# cloud list_devices — single-call SOM path
+# ---------------------------------------------------------------------------
+
+
+def _cloud_computer(
+    name: str = "PC001",
+    serial: str = "SN-CLOUD-001",
+    installation_status: int = 22,
+    last_contact_ms: int = 1_700_000_000_000,
+    os_platform_name: str = "Windows",
+    os_version: str = "10.0.19041",
+) -> dict:
+    return {
+        "full_name": name,
+        "managedcomputerextn.service_tag": serial,
+        "installation_status": installation_status,
+        "agent_last_contact_time": last_contact_ms,
+        "os_platform_name": os_platform_name,
+        "os_version": os_version,
+    }
+
+
+def _som_computers_response(computers: list[dict]) -> MagicMock:
+    return _make_response(
+        {
+            "message_response": {
+                "computers": computers,
+                "total": len(computers),
+            }
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_cloud_list_devices_uses_som_endpoint() -> None:
+    """Cloud variant uses /api/1.4/som/computers and reads inline serial."""
+    provider = ManageEngineProvider(_make_cloud_config())
+    provider._token_cache.set("tok", 3600)
+
+    som_resp = _som_computers_response([_cloud_computer("PC001", "SN-CLOUD")])
+
+    with patch("src.providers.manageengine.request_with_retry", new=AsyncMock(return_value=som_resp)):
+        result = await provider.list_devices()
+
+    assert len(result) == 1
+    assert result[0].serial_number == "SN-CLOUD"
+    assert result[0].hostname == "PC001"
+
+
+@pytest.mark.asyncio
+async def test_cloud_list_devices_skips_missing_serial() -> None:
+    """Cloud computer with no service_tag is skipped."""
+    provider = ManageEngineProvider(_make_cloud_config())
+    provider._token_cache.set("tok", 3600)
+
+    comp = _cloud_computer("PC001", serial="")
+    som_resp = _som_computers_response([comp])
+
+    with patch("src.providers.manageengine.request_with_retry", new=AsyncMock(return_value=som_resp)):
+        result = await provider.list_devices()
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_cloud_list_devices_normalises_serial() -> None:
+    """Serial number is stripped and upper-cased."""
+    provider = ManageEngineProvider(_make_cloud_config())
+    provider._token_cache.set("tok", 3600)
+
+    comp = _cloud_computer("PC001", serial="  sn-abc  ")
+    som_resp = _som_computers_response([comp])
+
+    with patch("src.providers.manageengine.request_with_retry", new=AsyncMock(return_value=som_resp)):
+        result = await provider.list_devices()
+
+    assert result[0].serial_number == "SN-ABC"
+
+
+# ---------------------------------------------------------------------------
+# determine_compliance — cloud (require_installed, default on)
+# ---------------------------------------------------------------------------
+
+
+def test_cloud_compliance_installed_status_22() -> None:
+    provider = ManageEngineProvider(_make_cloud_config())
+    assert provider.determine_compliance({"installation_status": 22}) is True
+
+
+def test_cloud_compliance_non_installed_status() -> None:
+    provider = ManageEngineProvider(_make_cloud_config())
+    assert provider.determine_compliance({"installation_status": 21}) is False
+
+
+def test_cloud_compliance_missing_status_is_non_compliant() -> None:
+    provider = ManageEngineProvider(_make_cloud_config())
+    assert provider.determine_compliance({}) is False
+
+
+def test_cloud_compliance_require_installed_false_ignores_installation_status() -> None:
+    """When require_installed is disabled, installation_status is not checked."""
+    provider = ManageEngineProvider(_make_cloud_config(require_installed=False))
+    assert provider.determine_compliance({"installation_status": 21}) is True
+
+
+# ---------------------------------------------------------------------------
+# determine_compliance — cloud require_live
+# ---------------------------------------------------------------------------
+
+
+def test_cloud_compliance_require_live_passes_when_live() -> None:
+    provider = ManageEngineProvider(_make_cloud_config(require_live=True))
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 1}) is True
+
+
+def test_cloud_compliance_require_live_fails_when_down() -> None:
+    provider = ManageEngineProvider(_make_cloud_config(require_live=True))
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 2}) is False
+
+
+def test_cloud_compliance_require_live_fails_when_unknown() -> None:
+    provider = ManageEngineProvider(_make_cloud_config(require_live=True))
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 3}) is False
+
+
+def test_cloud_compliance_require_live_false_does_not_check_live_status() -> None:
+    """Default behaviour — live status is not checked."""
+    provider = ManageEngineProvider(_make_cloud_config())
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 2}) is True
+
+
+def test_cloud_compliance_both_checks_enabled_must_pass_both() -> None:
+    provider = ManageEngineProvider(_make_cloud_config(require_installed=True, require_live=True))
+    # installed but not live → fail
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 2}) is False
+    # live but not installed → fail
+    assert provider.determine_compliance({"installation_status": 21, "computer_live_status": 1}) is False
+    # both pass → compliant
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 1}) is True
+
+
+def test_cloud_compliance_omitted_block_uses_defaults() -> None:
+    """Omitting the compliance block entirely defaults to require_installed=True, require_live=False."""
+    cfg = ManageEngineConfig(
+        type="manageengine",
+        enabled=True,
+        variant="cloud",
+        oauth_client_id="id",
+        oauth_client_secret="secret",
+        oauth_refresh_token="refresh",
+    )
+    provider = ManageEngineProvider(cfg)
+    assert cfg.compliance.require_installed is True
+    assert cfg.compliance.require_live is False
+    assert provider.determine_compliance({"installation_status": 22}) is True
+    assert provider.determine_compliance({"installation_status": 22, "computer_live_status": 2}) is True
+
+
+# ---------------------------------------------------------------------------
+# oauth_token_url — regional override
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_authenticate_cloud_uses_custom_token_url() -> None:
+    """oauth_token_url config field overrides the default Zoho US endpoint."""
+    cfg = ManageEngineConfig(
+        type="manageengine",
+        enabled=True,
+        variant="cloud",
+        oauth_client_id="id",
+        oauth_client_secret="secret",
+        oauth_refresh_token="refresh",
+        oauth_token_url="https://accounts.zohocloud.ca/oauth/v2/token",
+    )
+    provider = ManageEngineProvider(cfg)
+    token_resp = _zoho_token_response()
+
+    calls = []
+
+    async def _mock(client, method, url, **kwargs):
+        calls.append(url)
+        return token_resp
+
+    with patch("src.providers.manageengine.request_with_retry", new=_mock):
+        await provider.authenticate()
+
+    assert calls[0] == "https://accounts.zohocloud.ca/oauth/v2/token"
 
 
 # ---------------------------------------------------------------------------

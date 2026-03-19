@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m pytest tests/ -x -q --tb=short)"
+      "Bash(python -m pytest tests/ -x -q --tb=short)",
+      "WebSearch"
     ]
   }
 }

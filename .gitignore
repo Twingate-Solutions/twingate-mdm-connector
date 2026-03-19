@@ -181,6 +181,7 @@ cython_debug/
 .cursorindexingignore
 
 # Claude Code / AI planning & instruction files
+.claude/
 claude-md.md
 CLAUDE.md
 docs/TECHNICAL_PLAN.md

@@ -23,7 +23,7 @@ NinjaOne uses **OAuth2 Client Credentials** for machine-to-machine authenticatio
 5. In the "Create Application" dialog:
    - Set **Application type** to **Client Credentials** (not Authorization Code — that type is for user-facing OAuth flows).
    - Give the application a descriptive name, for example `twingate-bridge`.
-   - Under **Scopes**, enable **Monitoring** (read-only access to device data). You do not need any write scopes.
+   - Under **Scopes**, enable **Monitoring** only (read-only access to device data). Do not enable **Management** — NinjaOne will reject token requests if the application is not explicitly granted that scope, returning a `400 invalid_scope` error.
 6. Click **Save**.
 7. NinjaOne will display the **Client ID** and **Client Secret** once. Copy both values immediately and store them in a password manager or secrets vault — the Client Secret cannot be retrieved again after you close this dialog.
 
@@ -48,11 +48,11 @@ providers:
 |-------|----------|---------|-------------|
 | `type` | Yes | — | Must be `ninjaone` |
 | `enabled` | No | `true` | Set to `false` to disable this provider without removing the config block |
-| `region` | No | `app` | Regional endpoint prefix. `app` = US, `eu` = Europe, `ca` = Canada, `au` = Australia, `oc` = Oceania |
+| `region` | No | `app` | Regional endpoint prefix. `app` = US (legacy), `api` = US (current), `eu` = Europe, `ca` = Canada, `au` = Australia, `oc` = Oceania |
 | `client_id` | Yes | — | OAuth2 client ID copied from the API application |
 | `client_secret` | Yes | — | OAuth2 client secret copied from the API application |
 
-The base URL is constructed as `https://{region}.ninjarmm.com`. For a US-hosted tenant the effective URL is `https://app.ninjarmm.com`.
+The base URL is constructed as `https://{region}.ninjarmm.com`. US-hosted tenants may use either `app` (`https://app.ninjarmm.com`) or `api` (`https://api.ninjarmm.com`) — if `app` returns authentication errors, try `api`.
 
 ## Environment variables
 
@@ -87,6 +87,8 @@ A device must pass **both** checks to be considered compliant. If either field i
 ## Notes
 
 - **Platform coverage:** Only Windows and macOS agents report hardware serial numbers via the NinjaOne API. Linux agents, network devices, and mobile devices either do not report a serial number or report one that cannot be reliably matched. Devices without a serial number are silently skipped — they will not cause errors, but they also cannot be matched to Twingate devices.
+
+- **Serial number fields:** NinjaOne exposes serial numbers across three fields within the `system` object: `serialNumber`, `biosSerialNumber`, and `assetSerialNumber`. The bridge tries each in order and uses the first non-empty value. This handles devices (particularly VMs and some OEM hardware) where `serialNumber` is blank but the BIOS or asset serial is populated.
 
 - **Pagination:** NinjaOne uses cursor-based pagination. The `after` query parameter is used to fetch the next page of results. The bridge automatically follows all cursors and exhausts every page before returning results — you will never get a partial device list.
 

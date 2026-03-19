@@ -87,15 +87,22 @@ providers:
 
   # ---------------------------------------------------------------------------
   # ManageEngine Endpoint Central — cloud variant (uncomment to use)
-  # Auth: OAuth2 via Zoho
+  # Auth: OAuth2 via Zoho Self Client
+  # See docs/providers/manageengine.md for setup instructions and region URLs
   # ---------------------------------------------------------------------------
   # - type: manageengine
   #   enabled: false
   #   variant: cloud
-  #   base_url: https://endpointcentral.manageengine.com
+  #   base_url: ${MANAGEENGINE_BASE_URL}          # e.g. https://endpointcentral.manageengine.com
   #   oauth_client_id: ${MANAGEENGINE_OAUTH_CLIENT_ID}
   #   oauth_client_secret: ${MANAGEENGINE_OAUTH_CLIENT_SECRET}
   #   oauth_refresh_token: ${MANAGEENGINE_OAUTH_REFRESH_TOKEN}
+  #   oauth_token_url: ${MANAGEENGINE_OAUTH_TOKEN_URL}  # omit for US accounts
+  #
+  #   # Compliance checks (all optional — omitting uses the defaults shown)
+  #   compliance:
+  #     require_installed: true   # agent must be installed (installation_status == 22)
+  #     require_live: false       # set true to also require machine is online (computer_live_status == 1)
 
   # ---------------------------------------------------------------------------
   # Automox

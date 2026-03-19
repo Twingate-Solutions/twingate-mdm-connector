@@ -33,8 +33,14 @@ _CLOUD_BASE_URL = "https://endpointcentral.manageengine.com"
 _PAGE_LIMIT = 200
 _MAX_PAGES = 500
 
-# Managed-status values that indicate an active/healthy agent
+# On-prem: managed_status string values that indicate an active/healthy agent
 _ACTIVE_STATUSES = frozenset({"ACTIVE", "MANAGED"})
+
+# Cloud: installation_status value that indicates agent is installed and managed
+_CLOUD_INSTALLED_STATUS = 22
+
+# Cloud: computer_live_status value that indicates machine is reachable
+_CLOUD_LIVE_STATUS = 1
 
 
 class ManageEngineProvider(ProviderPlugin):
@@ -89,11 +95,12 @@ class ManageEngineProvider(ProviderPlugin):
         if not self._token_cache.needs_refresh():
             return
 
+        token_url = self._config.oauth_token_url or _ZOHO_TOKEN_URL
         log.debug("Refreshing ManageEngine Zoho access token", provider=self.name)
         response = await request_with_retry(
             self._client,
             "POST",
-            _ZOHO_TOKEN_URL,
+            token_url,
             data={
                 "grant_type": "refresh_token",
                 "client_id": self._config.oauth_client_id,
@@ -107,15 +114,16 @@ class ManageEngineProvider(ProviderPlugin):
         log.debug("ManageEngine Zoho access token refreshed", provider=self.name)
 
     async def list_devices(self) -> list[ProviderDevice]:
-        """Fetch all managed computers and join with hardware inventory.
+        """Fetch all managed computers.
 
-        Performs two paginated API calls:
+        **Cloud variant** performs a single paginated call to
+        ``/api/1.4/som/computers``, which includes serial numbers inline.
+
+        **On-prem variant** performs two paginated API calls and joins the
+        results by computer name:
 
         1. ``/api/1.4/desktop/computers`` — agent status, OS info, last contact.
         2. ``/dcapi/inventory/complist``   — serial numbers.
-
-        Computers are joined to inventory records by computer name
-        (case-insensitive).  Computers with no matching serial are skipped.
 
         Returns:
             List of normalised :class:`~src.providers.base.ProviderDevice`
@@ -126,6 +134,10 @@ class ManageEngineProvider(ProviderPlugin):
         """
         headers = self._auth_headers()
 
+        if self._config.variant == "cloud":
+            return await self._list_cloud_devices(headers)
+
+        # on-prem: two-call join
         computers = await self._fetch_computers(headers)
         serials = await self._fetch_inventory_serials(headers)
 
@@ -143,6 +155,62 @@ class ManageEngineProvider(ProviderPlugin):
             devices.append(self._build_device(comp, serial))
 
         log.info("ManageEngine computers fetched", provider=self.name, count=len(devices))
+        return devices
+
+    async def _list_cloud_devices(self, headers: dict[str, str]) -> list[ProviderDevice]:
+        """Fetch all managed computers from the cloud SOM endpoint.
+
+        The cloud ``/api/1.4/som/computers`` response embeds the serial number
+        (``managedcomputerextn.service_tag``) directly, so no second API call
+        is required.
+
+        Args:
+            headers: Auth headers for the request.
+
+        Returns:
+            List of normalised :class:`~src.providers.base.ProviderDevice`
+            instances.
+        """
+        devices: list[ProviderDevice] = []
+        page = 1
+
+        for _page_num in range(_MAX_PAGES):
+            response = await request_with_retry(
+                self._client,
+                "GET",
+                "/api/1.4/som/computers",
+                headers=headers,
+                params={"page": page, "pagelimit": _PAGE_LIMIT},
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            payload = data.get("message_response") or data
+            page_computers: list[dict] = payload.get("computers") or []
+
+            for comp in page_computers:
+                serial = (comp.get("managedcomputerextn.service_tag") or "").strip()
+                if not serial:
+                    log.debug(
+                        "ManageEngine cloud computer has no service_tag serial — skipping",
+                        provider=self.name,
+                        computer_name=comp.get("full_name"),
+                    )
+                    continue
+                devices.append(self._build_cloud_device(comp, serial))
+
+            total: int = payload.get("total") or 0
+            if len(page_computers) < _PAGE_LIMIT or (total and len(devices) >= total):
+                break
+            page += 1
+        else:
+            log.warning(
+                "ManageEngine cloud computers pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
+
+        log.info("ManageEngine cloud computers fetched", provider=self.name, count=len(devices))
         return devices
 
     async def _fetch_computers(self, headers: dict[str, str]) -> list[dict]:
@@ -231,21 +299,75 @@ class ManageEngineProvider(ProviderPlugin):
     def determine_compliance(self, device: dict) -> bool:
         """Evaluate compliance from the agent's managed status.
 
-        A device is compliant when its ``managed_status`` is ``ACTIVE`` or
-        ``MANAGED``, indicating a healthy, connected agent.
+        **On-prem:** checks ``managed_status`` string against ``ACTIVE`` /
+        ``MANAGED``.
+
+        **Cloud:** applies the checks enabled in ``config.compliance``:
+
+        * ``require_installed`` (default ``True``) — ``installation_status``
+          must be ``22`` (agent installed and managed).
+        * ``require_live`` (default ``False``) — ``computer_live_status``
+          must be ``1`` (machine is currently reachable by the agent).
 
         Args:
-            device: Raw ManageEngine computer object from ``/api/1.4/desktop/computers``.
+            device: Raw ManageEngine computer object.
 
         Returns:
-            ``True`` if the agent is in an active/managed state.
+            ``True`` if the device passes all enabled compliance checks.
         """
+        if self._config.variant == "cloud":
+            c = self._config.compliance
+            if c.require_installed:
+                if int(device.get("installation_status") or 0) != _CLOUD_INSTALLED_STATUS:
+                    return False
+            if c.require_live:
+                if int(device.get("computer_live_status") or 0) != _CLOUD_LIVE_STATUS:
+                    return False
+            return True
+
         status = (
             device.get("managed_status")
             or device.get("managedStatus")
             or ""
         ).strip().upper()
         return status in _ACTIVE_STATUSES
+
+    def _build_cloud_device(self, computer: dict, serial: str) -> ProviderDevice:
+        """Build a :class:`ProviderDevice` from a cloud SOM computer record.
+
+        The cloud ``/api/1.4/som/computers`` response uses different field
+        names from the on-prem API: ``full_name`` for hostname,
+        ``agent_last_contact_time`` for the last-seen timestamp, and
+        ``os_version`` / ``os_platform_name`` for OS details.
+
+        Args:
+            computer: Raw computer object from ``/api/1.4/som/computers``.
+            serial: Serial number from ``managedcomputerextn.service_tag``.
+
+        Returns:
+            Normalised :class:`ProviderDevice`.
+        """
+        last_seen: datetime | None = None
+        last_contact = computer.get("agent_last_contact_time")
+        if last_contact:
+            try:
+                ts_ms = int(last_contact)
+                last_seen = datetime.fromtimestamp(ts_ms / 1000, tz=UTC)
+            except (ValueError, TypeError, OSError):
+                pass
+
+        is_active = self.determine_compliance(computer)
+
+        return ProviderDevice(
+            serial_number=serial.strip().upper(),
+            hostname=computer.get("full_name") or computer.get("fqdn_name"),
+            os_name=computer.get("os_platform_name"),
+            os_version=computer.get("os_version"),
+            is_online=is_active,
+            is_compliant=is_active,
+            last_seen=last_seen,
+            raw=computer,
+        )
 
     def _build_device(self, computer: dict, serial: str) -> ProviderDevice:
         """Build a :class:`ProviderDevice` from a computer record + serial.
