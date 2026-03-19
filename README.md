@@ -1,5 +1,12 @@
 # Twingate MDM Connector
 
+> **Community project — not affiliated with or supported by Twingate.**
+> This project is an independent, community-built tool. It is not created, endorsed, or maintained by Twingate, Inc. Twingate's support team cannot assist with issues related to this connector. Please use the [issue tracker](../../issues) for bug reports and questions.
+>
+> This software is provided under the [Apache License 2.0](LICENSE) — without warranty of any kind, express or implied. Use in production environments is at your own discretion and risk. See the license for the full disclaimer of warranties and limitation of liability.
+>
+> This project was developed with assistance from AI language model tools.
+
 Twingate MDM Connector is open-source middleware that automatically marks devices as trusted in [Twingate](https://www.twingate.com/) by cross-referencing your MDM and EDR providers. You configure which providers to enable, and the connector runs on a schedule — querying each provider for its device inventory, matching devices to Twingate by serial number, and calling the Twingate API to set `isTrusted: true` on any device that passes your compliance rules. It runs as a stateless Docker container, requires no database, and never untrusts a device.
 
 ## How it works
