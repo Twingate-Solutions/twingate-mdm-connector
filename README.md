@@ -97,17 +97,18 @@ services:
 
 ## Supported providers
 
-| Provider | Auth | Docs |
-| -------- | ---- | ---- |
-| NinjaOne | OAuth2 client credentials | [docs/providers/ninjaone.md](docs/providers/ninjaone.md) |
-| Sophos | OAuth2 client credentials + tenant discovery | [docs/providers/sophos.md](docs/providers/sophos.md) |
-| ManageEngine | API token (on-prem) or Zoho OAuth2 (cloud) | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
-| Automox | API key | [docs/providers/automox.md](docs/providers/automox.md) |
-| JumpCloud | API key | [docs/providers/jumpcloud.md](docs/providers/jumpcloud.md) |
-| FleetDM | Bearer token | [docs/providers/fleetdm.md](docs/providers/fleetdm.md) |
-| Mosyle | Access token + email + password | [docs/providers/mosyle.md](docs/providers/mosyle.md) |
-| Datto RMM | OAuth2 client credentials | [docs/providers/datto.md](docs/providers/datto.md) |
-| Rippling | OAuth2 client credentials | [docs/providers/rippling.md](docs/providers/rippling.md) |
+| Provider | Auth | Tested | Docs |
+| -------- | ---- | :----: | ---- |
+| NinjaOne | OAuth2 client credentials | ✓ | [docs/providers/ninjaone.md](docs/providers/ninjaone.md) |
+| Sophos | OAuth2 client credentials + tenant discovery | | [docs/providers/sophos.md](docs/providers/sophos.md) |
+| ManageEngine (cloud) | Zoho OAuth2 | ✓ | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
+| ManageEngine (on-prem) | API token | | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
+| Automox | API key | | [docs/providers/automox.md](docs/providers/automox.md) |
+| JumpCloud | API key | | [docs/providers/jumpcloud.md](docs/providers/jumpcloud.md) |
+| FleetDM | Bearer token | | [docs/providers/fleetdm.md](docs/providers/fleetdm.md) |
+| Mosyle | Access token + email + password | | [docs/providers/mosyle.md](docs/providers/mosyle.md) |
+| Datto RMM | OAuth2 client credentials | | [docs/providers/datto.md](docs/providers/datto.md) |
+| Rippling | OAuth2 client credentials | | [docs/providers/rippling.md](docs/providers/rippling.md) |
 
 ## Sync behaviour
 
