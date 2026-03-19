@@ -102,11 +102,13 @@ Log output configuration.
 |---|---|---|---|
 | `level` | string | `INFO` | Log level: `DEBUG`, `INFO`, `WARNING`, or `ERROR` |
 | `format` | string | `json` | Output format. Only `json` (structured JSON to stdout) is currently supported |
+| `timezone` | string | `UTC` | IANA timezone name (e.g. `America/New_York`, `Europe/London`). Applies to log timestamps and notification email timestamps |
 
 ```yaml
 logging:
   level: INFO
   format: json
+  timezone: UTC
 ```
 
 ---
@@ -348,6 +350,7 @@ matching:
 logging:
   level: INFO
   format: json
+  timezone: UTC
 
 providers:
   - type: ninjaone
@@ -398,4 +401,78 @@ providers:
     enabled: false
     client_id: ${RIPPLING_CLIENT_ID}
     client_secret: ${RIPPLING_CLIENT_SECRET}
+```
+
+---
+
+## `notifications` (optional)
+
+Controls outbound alerts and summaries. The entire block is optional — omitting it
+disables all notifications entirely.
+
+### Event types
+
+Both channels use a string-based `events` list to enable/disable individual events.
+Adding a future event type (e.g., `device_untrusted`) requires no schema change —
+admins simply add the event name string to the relevant `events` list.
+
+| Event name | When it fires |
+| --- | --- |
+| `device_trusted` | A device is set to `isTrusted: true` (or would be in dry-run) |
+| `provider_error` | A provider fails to return data during a sync cycle |
+| `sync_complete` | Each sync cycle ends (includes aggregate stats) |
+| `mutation_error` | A trust mutation fails (sent via SMTP alert) |
+| `startup_failure` | The connector exits unexpectedly (sent via SMTP alert) |
+
+### `notifications.smtp`
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `host` | string | required | SMTP hostname |
+| `port` | int | `587` | SMTP port |
+| `username` | string | required | SMTP username |
+| `password` | string | required | Use `${SMTP_PASSWORD}` |
+| `from` | string | required | Sender address |
+| `to` | list[string] | required | Recipient(s) — at least one |
+| `tls_mode` | `starttls` \| `tls` | `starttls` | `starttls` for port 587 (STARTTLS); `tls` for port 465 (implicit TLS) |
+| `templates_dir` | string | `null` | Path to custom template directory |
+| `alerts.enabled` | bool | `true` | Enable immediate alert emails |
+| `alerts.events` | list[string] | `[provider_error, mutation_error, startup_failure]` | Alert event types |
+| `digest.enabled` | bool | `false` | Enable daily digest |
+| `digest.schedule` | string | `"08:00"` | Daily send time (HH:MM) |
+| `digest.timezone` | string | `"UTC"` | IANA timezone for schedule |
+
+**Custom email templates:** Copy any file from `src/notifications/templates/` to your
+`templates_dir` and edit freely. Templates use Python `string.Template` `$variable`
+syntax. Variables available in each template are listed in the file's comments.
+
+**Note:** Daily digest statistics reset on container restart.
+
+### `notifications.webhook`
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `url` | string | required | POST target URL. Use `${WEBHOOK_URL}` |
+| `secret` | string | `null` | HMAC-SHA256 shared secret. Adds `X-Hub-Signature-256` header |
+| `events` | list[string] | `[device_trusted, provider_error, sync_complete]` | Event types to fire |
+| `timeout_seconds` | int | `10` | Per-request timeout |
+
+**Payload example (`device_trusted`):**
+
+```json
+{
+  "event": "device_trusted",
+  "timestamp": "2026-01-15T08:32:10Z",
+  "device": {
+    "hostname": "CORP-LAPTOP-01",
+    "serial_masked": "****1234",
+    "os": "Windows",
+    "user_email": "alice@example.com"
+  },
+  "result": {
+    "trusted": true,
+    "providers_matched": ["ninjaone"],
+    "dry_run": false
+  }
+}
 ```

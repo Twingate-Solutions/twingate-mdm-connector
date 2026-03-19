@@ -46,6 +46,7 @@ trust:
 logging:
   level: INFO                      # DEBUG | INFO | WARNING | ERROR
   format: json                     # "json" (stdout) — only option in v1
+  timezone: UTC                    # IANA timezone name — affects log timestamps and email timestamps
 
 # -----------------------------------------------------------------------------
 # Providers
@@ -160,3 +161,53 @@ providers:
     enabled: false
     client_id: ${RIPPLING_CLIENT_ID}
     client_secret: ${RIPPLING_CLIENT_SECRET}
+
+# ---------------------------------------------------------------------------
+# Notifications (optional)
+# ---------------------------------------------------------------------------
+# Omit this entire block to disable all notifications.
+# Both channels are independently optional.
+
+# notifications:
+
+  # SMTP email — alerts and daily digest
+#   smtp:
+#     host: smtp.example.com
+#     port: 587
+#     username: ${SMTP_USERNAME}
+#     password: ${SMTP_PASSWORD}
+#     from: twingate-bridge@example.com
+#     to:
+#       - it-admin@example.com
+#       - security@example.com
+#     tls_mode: starttls           # "starttls" (port 587) or "tls" (port 465)
+#
+#     # Optional: path to a directory with custom email templates.
+#     # Copy files from src/notifications/templates/ and edit freely.
+#     # templates_dir: /opt/twingate-templates
+#
+#     # Which events trigger immediate alert emails.
+#     # Future events (e.g. device_untrusted) can be added here without code changes.
+#     alerts:
+#       enabled: true
+#       events:
+#         - provider_error
+#         - mutation_error
+#         - startup_failure
+#
+#     # Daily digest summary (disabled by default).
+#     digest:
+#       enabled: false
+#       schedule: "08:00"   # HH:MM
+#       timezone: UTC       # IANA timezone name
+
+  # HTTP webhooks — JSON POST with optional HMAC-SHA256 signing
+#   webhook:
+#     url: ${WEBHOOK_URL}
+#     secret: ${WEBHOOK_SECRET}       # optional — enables X-Hub-Signature-256 header
+#     timeout_seconds: 10
+#     # Which events to fire. Future events can be added without code changes.
+#     events:
+#       - device_trusted
+#       - provider_error
+#       - sync_complete
