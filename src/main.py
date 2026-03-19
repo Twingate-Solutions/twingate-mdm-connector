@@ -18,6 +18,8 @@ import signal
 import sys
 
 from src.config import AppConfig, load_config
+from src.notifications.digest import DigestAccumulator, run_digest_scheduler
+from src.notifications.factory import build_notifier
 from src.providers.base import ProviderPlugin
 from src.scheduler import run_scheduler
 from src.utils.logging import configure_logging, get_logger
@@ -122,7 +124,7 @@ async def _run() -> None:
         sys.exit(1)
 
     # Configure logging with the level from config.
-    configure_logging(config.logging.level)
+    configure_logging(config.logging.level, config.logging.timezone)
     global logger
     logger = get_logger(__name__)
 
@@ -140,6 +142,10 @@ async def _run() -> None:
 
     providers = _build_providers(config)
     logger.info("Providers instantiated", count=len(providers), names=[p.name for p in providers])
+
+    accumulator = DigestAccumulator()
+    notifier = build_notifier(config, accumulator)
+    logger.info("Notifier configured", notifier_type=type(notifier).__name__)
 
     # Register SIGTERM/SIGINT handlers so Docker stop / Kubernetes pod eviction
     # triggers a clean shutdown instead of a hard kill.  The handlers cancel the
@@ -162,6 +168,27 @@ async def _run() -> None:
     except (NotImplementedError, ValueError):
         pass  # Windows — SIGINT already handled via KeyboardInterrupt in main()
 
+    digest_task: asyncio.Task | None = None
+    if (
+        config.notifications is not None
+        and config.notifications.smtp is not None
+        and config.notifications.smtp.digest.enabled
+    ):
+        from src.notifications.smtp import SmtpNotifier
+        digest_task = asyncio.create_task(
+            run_digest_scheduler(
+                accumulator=accumulator,
+                smtp_notifier=SmtpNotifier(config.notifications.smtp, display_timezone=config.logging.timezone),
+                schedule_hhmm=config.notifications.smtp.digest.schedule,
+                tz_name=config.notifications.smtp.digest.timezone,
+            )
+        )
+        logger.info(
+            "Daily digest scheduler started",
+            schedule=config.notifications.smtp.digest.schedule,
+            timezone=config.notifications.smtp.digest.timezone,
+        )
+
     # Start optional health-check server (enabled by HEALTHZ_PORT env var).
     healthz_task: asyncio.Task | None = None
     healthz_port_str = os.environ.get("HEALTHZ_PORT")
@@ -175,14 +202,15 @@ async def _run() -> None:
             logger.warning("Could not start health-check server", error=str(exc))
 
     try:
-        await run_scheduler(config, providers)
+        await run_scheduler(config, providers, notifier=notifier)
     finally:
-        if healthz_task and not healthz_task.done():
-            healthz_task.cancel()
-            try:
-                await healthz_task
-            except (asyncio.CancelledError, Exception):
-                pass
+        for task in (healthz_task, digest_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
 
 def main() -> None:

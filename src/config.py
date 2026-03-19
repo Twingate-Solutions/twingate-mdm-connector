@@ -10,6 +10,11 @@ import re
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+# TLS mode for SMTP connections.
+# ``starttls`` — plain connection upgraded via STARTTLS (port 587, most providers)
+# ``tls``      — implicit TLS from the start (port 465)
+TlsMode = Literal["starttls", "tls"]
+
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
@@ -54,6 +59,79 @@ class LoggingConfig(BaseModel):
 
     level: str = "INFO"
     format: str = "json"
+    timezone: str = "UTC"  # IANA timezone name — used for log timestamps and notification emails
+
+
+# ---------------------------------------------------------------------------
+# Notification configs
+# ---------------------------------------------------------------------------
+
+
+class SmtpAlertsConfig(BaseModel):
+    """Per-event controls for immediate SMTP alert emails.
+
+    The ``events`` list mirrors the ``webhook.events`` pattern — add any
+    event name string to enable that alert type.  Future event types
+    (e.g. ``device_untrusted``) are supported without schema changes.
+    """
+
+    enabled: bool = True
+    events: list[str] = Field(
+        default_factory=lambda: ["provider_error", "mutation_error", "startup_failure"]
+    )
+
+
+class SmtpDigestConfig(BaseModel):
+    """Controls the daily digest summary email."""
+
+    enabled: bool = False
+    schedule: str = "08:00"   # HH:MM in the configured timezone
+    timezone: str = "UTC"
+
+
+class SmtpConfig(BaseModel):
+    """SMTP email channel configuration.
+
+    Templates are loaded from ``templates_dir`` if set, otherwise from the
+    bundled defaults in ``src/notifications/templates/``.  Templates are
+    plain-text files using Python ``string.Template`` ``$variable`` syntax.
+    """
+
+    host: str
+    port: int = 587
+    username: str
+    password: str
+    from_address: str = Field(alias="from", default="")
+    to: list[str] = Field(min_length=1)
+    tls_mode: TlsMode = "starttls"
+    alerts: SmtpAlertsConfig = Field(default_factory=SmtpAlertsConfig)
+    digest: SmtpDigestConfig = Field(default_factory=SmtpDigestConfig)
+    templates_dir: str | None = None   # override bundled templates
+
+    model_config = {"populate_by_name": True}
+
+
+class WebhookConfig(BaseModel):
+    """HTTP webhook channel configuration.
+
+    The ``events`` list controls which event types fire a webhook POST.
+    Future event types are supported without schema changes — just add the
+    new event name string to this list.
+    """
+
+    url: str
+    secret: str | None = None
+    events: list[str] = Field(
+        default_factory=lambda: ["device_trusted", "provider_error", "sync_complete"]
+    )
+    timeout_seconds: int = 10
+
+
+class NotificationsConfig(BaseModel):
+    """Top-level notifications block.  Both channels are independently optional."""
+
+    smtp: SmtpConfig | None = None
+    webhook: WebhookConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +303,7 @@ class AppConfig(BaseModel):
     trust: TrustConfig = Field(default_factory=TrustConfig)
     providers: list[ProviderConfig] = Field(default_factory=list)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    notifications: NotificationsConfig | None = None
 
     @property
     def enabled_providers(self) -> list[ProviderConfig]:

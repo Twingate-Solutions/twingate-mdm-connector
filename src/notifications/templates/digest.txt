@@ -1,0 +1,16 @@
+[twingate-mdm-connector] Daily digest — $date
+
+Sync cycles completed: $num_cycles
+Devices checked:       $total_untrusted
+Devices trusted:       $total_trusted
+Devices skipped:       $total_skipped
+Errors:                $total_errors
+
+Providers active: $provider_names
+
+---
+Serial numbers in this report are partially masked (e.g. ****1234) for security.
+Digest statistics reset on container restart — this report covers cycles since last restart or last digest, whichever is more recent.
+
+To disable this digest, set smtp.digest.enabled: false in config.yaml.
+To change the send time, update smtp.digest.schedule.

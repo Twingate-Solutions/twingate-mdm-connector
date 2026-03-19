@@ -173,6 +173,36 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide and [docs
 
 See [docs/testing/overview.md](docs/testing/overview.md) for the end-to-end testing guide, which covers obtaining provider credentials, setting up a Windows test VM, and validating the full trust flow.
 
+## Notifications
+
+The connector can send outbound alerts and daily summaries via two optional, independently-configurable channels.
+
+### SMTP Email
+
+- **Error alerts** — sent immediately when a provider fails, a trust mutation fails, or the connector exits unexpectedly
+- **Daily digest** — scheduled summary email at a configurable wall-clock time
+
+**Customisable templates:** Email bodies are rendered from editable `.txt` files.
+Copy any file from [`src/notifications/templates/`](src/notifications/templates/) to
+your own directory, set `smtp.templates_dir` in `config.yaml`, and edit freely
+(e.g., add your internal IT contact, support links, or extra context).
+
+Serial numbers in all emails are partially masked (`****1234`) to avoid leaking device identifiers.
+
+### HTTP Webhooks
+
+Signed JSON POST requests fired for configurable event types:
+
+- `device_trusted` — fired per device when `isTrusted: true` is set
+- `provider_error` — fired when a provider fails for a cycle
+- `sync_complete` — fired at the end of each cycle with aggregate stats
+
+Optional HMAC-SHA256 payload signing via a shared secret (`X-Hub-Signature-256` header).
+
+Both channels support future event types (e.g., untrust events) without config schema changes — admins add the event name to the `events` list in `config.yaml`.
+
+See [docs/configuration.md](docs/configuration.md) for the full `notifications:` reference.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).

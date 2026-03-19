@@ -14,6 +14,7 @@ import asyncio
 
 from src.config import AppConfig
 from src.engine import run_sync_cycle
+from src.notifications.base import NullNotifier, Notifier
 from src.providers.base import ProviderPlugin
 from src.twingate.client import TwingateClient
 from src.utils.logging import get_logger
@@ -24,6 +25,7 @@ logger = get_logger(__name__)
 async def run_scheduler(
     config: AppConfig,
     providers: list[ProviderPlugin],
+    notifier: Notifier | None = None,
 ) -> None:
     """Start the sync scheduler loop.
 
@@ -37,7 +39,10 @@ async def run_scheduler(
         config: Validated application configuration.
         providers: Instantiated, enabled :class:`~src.providers.base.ProviderPlugin`
             instances (already constructed — this function does not create them).
+        notifier: Notification channel. Defaults to a no-op :class:`NullNotifier`.
     """
+    if notifier is None:
+        notifier = NullNotifier()
     interval = config.sync.interval_seconds
     dry_run = config.sync.dry_run
 
@@ -64,6 +69,7 @@ async def run_scheduler(
                         config=config,
                         providers=providers,
                         tg_client=tg_client,
+                        notifier=notifier,
                     )
             except Exception as exc:
                 # Cycle-level error (e.g. Twingate API totally unavailable).

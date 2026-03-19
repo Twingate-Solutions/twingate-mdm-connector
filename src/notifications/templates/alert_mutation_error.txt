@@ -1,0 +1,11 @@
+[twingate-mdm-connector] Error: failed to trust device
+
+Device ID:  $device_id
+Device:     $device_name
+Serial:     $serial_masked
+Error:      $error_message
+Time ($timezone): $timestamp
+
+---
+This alert was sent because 'mutation_error' is in your smtp.alerts.events list.
+To silence this alert, remove 'mutation_error' from smtp.alerts.events in config.yaml.

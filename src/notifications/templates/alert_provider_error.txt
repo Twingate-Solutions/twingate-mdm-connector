@@ -1,0 +1,9 @@
+[twingate-mdm-connector] Error: provider '$provider_name' failed
+
+Provider:   $provider_name
+Error:      $error_message
+Time ($timezone): $timestamp
+
+---
+This alert was sent because 'provider_error' is in your smtp.alerts.events list.
+To silence this alert, remove 'provider_error' from smtp.alerts.events in config.yaml.

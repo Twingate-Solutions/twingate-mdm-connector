@@ -9,12 +9,28 @@ log-aggregation system (Datadog, Loki, CloudWatch, etc.).
 
 import logging
 import sys
+import zoneinfo
+from datetime import datetime
 from typing import Any
 
 import structlog
 
 
-def configure_logging(level: str = "INFO") -> None:
+def _make_timestamper(tz_name: str):
+    """Return a structlog processor that stamps events with a timezone-aware ISO timestamp."""
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = zoneinfo.ZoneInfo("UTC")
+
+    def _stamp(logger: Any, method: str, event_dict: dict) -> dict:
+        event_dict["timestamp"] = datetime.now(tz=tz).isoformat()
+        return event_dict
+
+    return _stamp
+
+
+def configure_logging(level: str = "INFO", timezone: str = "UTC") -> None:
     """Configure structlog for JSON output to stdout.
 
     Should be called exactly once, before any logging takes place.
@@ -22,6 +38,8 @@ def configure_logging(level: str = "INFO") -> None:
     Args:
         level: Standard Python log level name (``DEBUG``, ``INFO``,
                ``WARNING``, ``ERROR``). Case-insensitive.
+        timezone: IANA timezone name for log timestamps (e.g. ``"America/New_York"``).
+                  Defaults to ``"UTC"``.
     """
     log_level = getattr(logging, level.upper(), logging.INFO)
 
@@ -45,8 +63,8 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.stdlib.filter_by_level,
             structlog.stdlib.add_log_level,
             structlog.stdlib.add_logger_name,
-            # ISO-8601 timestamp.
-            structlog.processors.TimeStamper(fmt="iso"),
+            # ISO-8601 timestamp in the configured timezone.
+            _make_timestamper(timezone),
             # Render exception info as a string rather than a Python object.
             structlog.processors.format_exc_info,
             structlog.processors.StackInfoRenderer(),

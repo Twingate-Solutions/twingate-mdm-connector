@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.config import AppConfig, SyncConfig, TrustConfig, TwingateConfig
-from src.engine import CycleSummary, run_sync_cycle
+from src.engine import run_sync_cycle
+from src.notifications.base import NullNotifier, SyncCompleteEvent
 from src.providers.base import ProviderDevice, ProviderPlugin
 from src.twingate.models import TrustMutationEntity, TrustMutationResult, TwingateDevice
 
@@ -304,3 +305,133 @@ async def test_summary_counts_are_accurate() -> None:
     assert summary.total_trusted == 1
     assert summary.total_skipped == 1
     assert summary.total_no_match == 2  # UNKNOWN + None serial
+
+
+# ---- Notification wiring tests ----
+
+
+class TestEngineNotifierEvents:
+    """Verify the engine emits events to the injected notifier."""
+
+    @pytest.mark.asyncio
+    async def test_on_provider_error_called_when_provider_fetch_fails(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        failing_provider = MagicMock()
+        failing_provider.name = "failing"
+        failing_provider.fetch = AsyncMock(side_effect=Exception("boom"))
+
+        tg_client = MagicMock()
+        tg_client.list_untrusted_devices = AsyncMock(return_value=[])
+
+        notifier = AsyncMock(spec=NullNotifier)
+        config = _make_config()
+        await run_sync_cycle(
+            config=config,
+            providers=[failing_provider],
+            tg_client=tg_client,
+            notifier=notifier,
+        )
+        notifier.on_provider_error.assert_awaited_once()
+        call_event = notifier.on_provider_error.call_args[0][0]
+        assert call_event.provider_name == "failing"
+
+    @pytest.mark.asyncio
+    async def test_on_sync_complete_always_called(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        tg_client = MagicMock()
+        tg_client.list_untrusted_devices = AsyncMock(return_value=[])
+
+        notifier = AsyncMock(spec=NullNotifier)
+        config = _make_config()
+        await run_sync_cycle(
+            config=config,
+            providers=[],
+            tg_client=tg_client,
+            notifier=notifier,
+        )
+        notifier.on_sync_complete.assert_awaited_once()
+        call_event = notifier.on_sync_complete.call_args[0][0]
+        assert isinstance(call_event, SyncCompleteEvent)
+
+    @pytest.mark.asyncio
+    async def test_on_device_trusted_called_when_device_trusted(self) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+        from src.twingate.models import TrustMutationResult, TrustMutationEntity
+
+        provider = MockProvider("ninjaone", [_make_provider_device("SN123")])
+        tg_device = _make_tg_device("dev-1", serial="SN123")
+
+        tg_client = MagicMock()
+        tg_client.list_untrusted_devices = AsyncMock(return_value=[tg_device])
+        tg_client.trust_device = AsyncMock(return_value=TrustMutationResult(
+            ok=True,
+            entity=TrustMutationEntity(id="dev-1", isTrusted=True),
+            error=None,
+        ))
+
+        notifier = AsyncMock(spec=NullNotifier)
+        config = _make_config(dry_run=False)
+        await run_sync_cycle(
+            config=config,
+            providers=[provider],
+            tg_client=tg_client,
+            notifier=notifier,
+        )
+        notifier.on_device_trusted.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_default_notifier_is_null_when_not_passed(self) -> None:
+        """run_sync_cycle must work without a notifier argument (backwards compat)."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        tg_client = MagicMock()
+        tg_client.list_untrusted_devices = AsyncMock(return_value=[])
+
+        config = _make_config()
+        # must not raise
+        await run_sync_cycle(config=config, providers=[], tg_client=tg_client)
+
+    @pytest.mark.asyncio
+    async def test_on_device_trusted_called_with_dry_run_flag(self) -> None:
+        """Dry-run trust must emit on_device_trusted with dry_run=True."""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.notifications.base import TrustEvent
+
+        provider = MockProvider("ninjaone", [_make_provider_device("SN123")])
+        tg_device = _make_tg_device("dev-1", serial="SN123")
+
+        tg_client = MagicMock()
+        tg_client.list_untrusted_devices = AsyncMock(return_value=[tg_device])
+
+        notifier = AsyncMock(spec=NullNotifier)
+        config = _make_config(dry_run=True)
+        await run_sync_cycle(
+            config=config,
+            providers=[provider],
+            tg_client=tg_client,
+            notifier=notifier,
+        )
+        notifier.on_device_trusted.assert_awaited_once()
+        call_event = notifier.on_device_trusted.call_args[0][0]
+        assert isinstance(call_event, TrustEvent)
+        assert call_event.dry_run is True
+
+    @pytest.mark.asyncio
+    async def test_on_sync_complete_called_when_twingate_fetch_fails(self) -> None:
+        """Even when Twingate fails, on_sync_complete must still be emitted."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        tg_client = MagicMock()
+        tg_client.list_untrusted_devices = AsyncMock(side_effect=Exception("twingate down"))
+
+        notifier = AsyncMock(spec=NullNotifier)
+        config = _make_config()
+        await run_sync_cycle(
+            config=config,
+            providers=[],
+            tg_client=tg_client,
+            notifier=notifier,
+        )
+        notifier.on_sync_complete.assert_awaited_once()

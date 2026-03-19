@@ -1,0 +1,10 @@
+[twingate-mdm-connector] Startup failure
+
+Error:      $error_message
+Time ($timezone): $timestamp
+
+The connector exited unexpectedly. Please check your configuration and container logs.
+
+---
+This alert was sent because 'startup_failure' is in your smtp.alerts.events list.
+To silence this alert, remove 'startup_failure' from smtp.alerts.events in config.yaml.

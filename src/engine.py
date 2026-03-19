@@ -13,9 +13,11 @@ Each call to :func:`run_sync_cycle` performs a full reconciliation:
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from src.config import AppConfig
 from src.matching import build_provider_index, evaluate_trust, normalize_serial
+from src.notifications.base import NullNotifier, Notifier, ProviderErrorEvent, SyncCompleteEvent, TrustEvent
 from src.providers.base import ProviderDevice, ProviderPlugin
 from src.twingate.client import TwingateClient
 from src.twingate.models import TwingateDevice
@@ -62,6 +64,7 @@ async def run_sync_cycle(
     config: AppConfig,
     providers: list[ProviderPlugin],
     tg_client: TwingateClient,
+    notifier: Notifier | None = None,
 ) -> CycleSummary:
     """Execute one full sync cycle.
 
@@ -70,10 +73,13 @@ async def run_sync_cycle(
         providers: Instantiated, enabled provider plugins.
         tg_client: An open :class:`~src.twingate.client.TwingateClient`
             (caller is responsible for lifecycle).
+        notifier: Notification channel. Defaults to a no-op :class:`NullNotifier`.
 
     Returns:
         A :class:`CycleSummary` with per-provider and aggregate stats.
     """
+    if notifier is None:
+        notifier = NullNotifier()
     summary = CycleSummary()
 
     # ------------------------------------------------------------------ #
@@ -102,6 +108,11 @@ async def run_sync_cycle(
                 provider=plugin.name,
                 error=str(exc),
             )
+            await notifier.on_provider_error(ProviderErrorEvent(
+                provider_name=plugin.name,
+                error_message=str(exc),
+                timestamp=datetime.now(tz=timezone.utc),
+            ))
 
     await asyncio.gather(*[_fetch_provider(p) for p in providers])
     summary.provider_stats = list(provider_stats_map.values())
@@ -112,6 +123,17 @@ async def run_sync_cycle(
 
     if not available_providers:
         logger.warning("No providers available for this cycle — skipping trust evaluation")
+        _log_summary(summary)
+        await notifier.on_sync_complete(SyncCompleteEvent(
+            total_untrusted=summary.total_untrusted,
+            total_trusted=summary.total_trusted,
+            total_skipped=summary.total_skipped,
+            total_no_match=summary.total_no_match,
+            total_errors=summary.total_errors,
+            provider_names=tuple(p.name for p in providers),
+            cycle_number=0,
+            timestamp=datetime.now(tz=timezone.utc),
+        ))
         return summary
 
     # ------------------------------------------------------------------ #
@@ -124,6 +146,17 @@ async def run_sync_cycle(
             "Failed to fetch untrusted devices from Twingate — aborting cycle",
             error=str(exc),
         )
+        _log_summary(summary)
+        await notifier.on_sync_complete(SyncCompleteEvent(
+            total_untrusted=summary.total_untrusted,
+            total_trusted=summary.total_trusted,
+            total_skipped=summary.total_skipped,
+            total_no_match=summary.total_no_match,
+            total_errors=summary.total_errors,
+            provider_names=tuple(p.name for p in providers),
+            cycle_number=0,
+            timestamp=datetime.now(tz=timezone.utc),
+        ))
         return summary
 
     summary.total_untrusted = len(untrusted)
@@ -141,12 +174,23 @@ async def run_sync_cycle(
             provider_stats_map=provider_stats_map,
             tg_client=tg_client,
             summary=summary,
+            notifier=notifier,
         )
 
     # ------------------------------------------------------------------ #
     # Step 5: Log summary                                                 #
     # ------------------------------------------------------------------ #
     _log_summary(summary)
+    await notifier.on_sync_complete(SyncCompleteEvent(
+        total_untrusted=summary.total_untrusted,
+        total_trusted=summary.total_trusted,
+        total_skipped=summary.total_skipped,
+        total_no_match=summary.total_no_match,
+        total_errors=summary.total_errors,
+        provider_names=tuple(p.name for p in providers),
+        cycle_number=0,
+        timestamp=datetime.now(tz=timezone.utc),
+    ))
     return summary
 
 
@@ -158,6 +202,7 @@ async def _process_device(
     provider_stats_map: dict[str, ProviderStats],
     tg_client: TwingateClient,
     summary: CycleSummary,
+    notifier: Notifier | None = None,
 ) -> None:
     """Evaluate and potentially trust a single untrusted Twingate device."""
     serial = normalize_serial(tg_device.serial_number)
@@ -212,6 +257,7 @@ async def _process_device(
             config=config,
             tg_client=tg_client,
             summary=summary,
+            notifier=notifier,
         )
     else:
         logger.info(
@@ -238,6 +284,7 @@ async def _trust_device(
     config: AppConfig,
     tg_client: TwingateClient,
     summary: CycleSummary,
+    notifier: Notifier | None = None,
 ) -> None:
     """Issue (or simulate) a trust mutation for a device."""
     if config.sync.dry_run:
@@ -249,6 +296,16 @@ async def _trust_device(
             via_providers=contributors,
         )
         summary.total_trusted += 1
+        await notifier.on_device_trusted(TrustEvent(
+            device_id=tg_device.id,
+            device_name=tg_device.name,
+            serial_number=serial,
+            os_name=None,
+            user_email=None,
+            providers=tuple(contributors),
+            timestamp=datetime.now(tz=timezone.utc),
+            dry_run=True,
+        ))
         return
 
     try:
@@ -262,6 +319,16 @@ async def _trust_device(
                 via_providers=contributors,
             )
             summary.total_trusted += 1
+            await notifier.on_device_trusted(TrustEvent(
+                device_id=tg_device.id,
+                device_name=tg_device.name,
+                serial_number=serial,
+                os_name=None,
+                user_email=None,
+                providers=tuple(contributors),
+                timestamp=datetime.now(tz=timezone.utc),
+                dry_run=False,
+            ))
         else:
             logger.error(
                 "Trust mutation failed",

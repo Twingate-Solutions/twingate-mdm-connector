@@ -186,6 +186,7 @@ claude-md.md
 CLAUDE.md
 docs/TECHNICAL_PLAN.md
 docs/twingate-device-trust-bridge.md
+docs/superpowers/
 
 # Local config (contains credentials — use config.yaml.example as template)
 config.yaml
