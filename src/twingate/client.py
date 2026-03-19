@@ -2,7 +2,7 @@
 
 Provides two operations:
 - :meth:`TwingateClient.list_untrusted_devices` — exhaustively paginates through
-  all devices where ``isTrusted == false``.
+  all devices where ``isTrusted == false`` and ``activeState == ACTIVE``.
 - :meth:`TwingateClient.trust_device` — calls the ``deviceUpdate`` mutation to
   mark a device as trusted.
 
@@ -24,13 +24,19 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
+# Pagination safety limit
+# ---------------------------------------------------------------------------
+
+_MAX_PAGES = 500
+
+# ---------------------------------------------------------------------------
 # GraphQL query and mutation strings
 # ---------------------------------------------------------------------------
 
 _QUERY_UNTRUSTED_DEVICES = """
 query GetUntrustedDevices($after: String, $first: Int) {
   devices(
-    filter: { isTrusted: { eq: false } }
+    filter: { isTrusted: { eq: false }, activeState: { in: [ACTIVE] } }
     after: $after
     first: $first
   ) {
@@ -133,7 +139,7 @@ class TwingateClient:
         devices: list[TwingateDevice] = []
         cursor: str | None = None
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             variables: dict[str, Any] = {"first": self._batch_size}
             if cursor:
                 variables["after"] = cursor
@@ -155,6 +161,11 @@ class TwingateClient:
                 break
 
             cursor = connection.page_info.end_cursor
+        else:
+            logger.warning(
+                "Twingate pagination safety limit reached — results may be incomplete",
+                max_pages=_MAX_PAGES,
+            )
 
         logger.info(
             "Fetched untrusted devices from Twingate",

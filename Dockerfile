@@ -16,4 +16,8 @@ COPY config.yaml.example ./config.yaml
 # Ensure Python output is sent straight to stdout/stderr (no buffering)
 ENV PYTHONUNBUFFERED=1
 
+# Run as a non-root user to reduce container escape blast radius
+RUN addgroup --system app && adduser --system --ingroup app --no-create-home app
+USER app
+
 CMD ["python", "-m", "src.main"]

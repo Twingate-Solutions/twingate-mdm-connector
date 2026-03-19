@@ -80,6 +80,25 @@ class SophosConfig(BaseModel):
     client_secret: str
 
 
+class ManageEngineCloudComplianceConfig(BaseModel):
+    """Compliance check settings for the ManageEngine cloud variant.
+
+    Both checks are evaluated together — a device must pass every enabled
+    check to be considered compliant.
+
+    Attributes:
+        require_installed: Require ``installation_status == 22`` (agent is
+            installed and managed).  Enabled by default.
+        require_live: Require ``computer_live_status == 1`` (machine is
+            currently reachable by the Endpoint Central agent).  Disabled by
+            default — enable this for stricter checks that reject devices
+            whose agent has gone silent.
+    """
+
+    require_installed: bool = True
+    require_live: bool = False
+
+
 class ManageEngineConfig(BaseModel):
     """ManageEngine Endpoint Central provider configuration.
 
@@ -100,6 +119,10 @@ class ManageEngineConfig(BaseModel):
     oauth_client_id: str | None = None
     oauth_client_secret: str | None = None
     oauth_refresh_token: str | None = None
+    oauth_token_url: str | None = None  # defaults to accounts.zoho.com; set for other regions
+
+    # cloud compliance (omitting this block uses the defaults)
+    compliance: ManageEngineCloudComplianceConfig = ManageEngineCloudComplianceConfig()
 
     @model_validator(mode="after")
     def _check_auth_fields(self) -> "ManageEngineConfig":
@@ -164,6 +187,15 @@ class DattoConfig(BaseModel):
     api_secret: str
 
 
+class RipplingConfig(BaseModel):
+    """Rippling HR/IT platform provider configuration."""
+
+    type: Literal["rippling"]
+    enabled: bool = False
+    client_id: str
+    client_secret: str
+
+
 # Discriminated union of all provider config types
 ProviderConfig = Annotated[
     NinjaOneConfig
@@ -173,7 +205,8 @@ ProviderConfig = Annotated[
     | JumpCloudConfig
     | FleetDMConfig
     | MosyleConfig
-    | DattoConfig,
+    | DattoConfig
+    | RipplingConfig,
     Field(discriminator="type"),
 ]
 

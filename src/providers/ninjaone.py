@@ -19,6 +19,7 @@ log = structlog.get_logger()
 # Regional API base URLs
 _REGION_BASES: dict[str, str] = {
     "app": "https://app.ninjarmm.com",
+    "api": "https://api.ninjarmm.com",
     "eu": "https://eu.ninjarmm.com",
     "ca": "https://ca.ninjarmm.com",
     "au": "https://au.ninjarmm.com",
@@ -26,6 +27,7 @@ _REGION_BASES: dict[str, str] = {
 }
 
 _PAGE_SIZE = 200
+_MAX_PAGES = 500
 
 # AV threat statuses that indicate a clean device
 _CLEAN_THREAT_STATUSES = frozenset({"GOOD", "PROTECTED", "NOT_RUNNING", ""})
@@ -65,7 +67,7 @@ class NinjaOneProvider(ProviderPlugin):
     async def authenticate(self) -> None:
         """Obtain or refresh the OAuth2 access token.
 
-        Uses the client credentials flow with scope ``monitoring management``.
+        Uses the client credentials flow with scope ``monitoring``.
         The token is cached and refreshed proactively 60 s before expiry.
 
         Raises:
@@ -83,7 +85,7 @@ class NinjaOneProvider(ProviderPlugin):
                 "grant_type": "client_credentials",
                 "client_id": self._config.client_id,
                 "client_secret": self._config.client_secret,
-                "scope": "monitoring management",
+                "scope": "monitoring",
             },
         )
         response.raise_for_status()
@@ -109,7 +111,7 @@ class NinjaOneProvider(ProviderPlugin):
         cursor: str | None = None
         headers = {"Authorization": f"Bearer {self._token_cache.token}"}
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             params: dict[str, str | int] = {"pageSize": _PAGE_SIZE}
             if cursor:
                 params["after"] = cursor
@@ -146,6 +148,12 @@ class NinjaOneProvider(ProviderPlugin):
             if last_id is None:
                 break
             cursor = str(last_id)
+        else:
+            log.warning(
+                "NinjaOne pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         log.info("NinjaOne devices fetched", provider=self.name, count=len(devices))
         return devices
@@ -186,6 +194,8 @@ class NinjaOneProvider(ProviderPlugin):
         system = device.get("system") or {}
         serial_raw: str = (
             system.get("serialNumber")
+            or system.get("biosSerialNumber")
+            or system.get("assetSerialNumber")
             or device.get("systemSerialNumber")
             or ""
         )

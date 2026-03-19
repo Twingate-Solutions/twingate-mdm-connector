@@ -47,55 +47,93 @@ twingate:
 export TWINGATE_API_KEY=your_api_key_here
 ```
 
-## Step 4: Confirm the device appears as untrusted
+## Step 4: Verify the API connection and list untrusted devices
 
-### Via Admin Console
+Before configuring any providers, verify that your API key and tenant are correct and that the bridge can reach the Twingate GraphQL API.
 
-Go to **Admin Console > Devices**. The VM should appear with **Trust Status: Untrusted**.
-
-If the device is not listed, see the troubleshooting note in [windows-vm-setup.md](windows-vm-setup.md) — the Twingate client must have authenticated and connected at least once.
-
-### Via GraphQL API
-
-You can confirm via the API directly using curl:
+First, install the only required dependency:
 
 ```bash
-curl -s -X POST \
-  "https://{tenant}.twingate.com/api/graphql/" \
-  -H "X-API-KEY: {api_key}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "{ devices(filter: { isTrusted: { eq: false } }) { edges { node { id name serialNumber isTrusted lastConnectedAt } } } }"
-  }' | python -m json.tool
+pip install httpx
 ```
 
-Replace `{tenant}` and `{api_key}` with your values. The response should include the test VM with `"isTrusted": false` and a non-null `serialNumber`.
+Then run the Twingate client smoke test:
 
-**Example response:**
+```bash
+python scripts/test-twingate-client.py \
+  --tenant your-tenant \
+  --api-key $TWINGATE_API_KEY
+```
 
-```json
+This script fetches all untrusted **active** devices (archived devices are excluded) and pretty-prints them as JSON. A successful run looks like:
+
+```text
+Connecting to https://your-tenant.twingate.com/api/graphql/
+
+{"count": 1, "event": "Fetched untrusted devices from Twingate", ...}
+
+--- 1 untrusted device(s) ---
+
 {
-  "data": {
-    "devices": {
-      "edges": [
-        {
-          "node": {
-            "id": "RGV2aWNlOjE2MzU4NA==",
-            "name": "DESKTOP-ABC123",
-            "serialNumber": "VMW-1234-5678",
-            "isTrusted": false,
-            "lastConnectedAt": "2025-03-10T09:55:00Z"
-          }
-        }
-      ]
-    }
-  }
+  "id": "RGV2aWNlOjE2MzU4NA==",
+  "name": "DESKTOP-ABC123",
+  "serial_number": "VMW-1234-5678",
+  "os_name": "WINDOWS",
+  "is_trusted": false,
+  "active_state": "ACTIVE",
+  ...
 }
 ```
 
-Note the `serialNumber` field. This is what the bridge will normalise (`.strip().upper()`) and compare against provider serials.
+Note the `serial_number` field — this is what the bridge normalises (`.strip().upper()`) and compares against provider serials. If `serial_number` is `null`, the bridge will skip that device entirely.
 
-## Step 5: Dry-run first pass
+If the device is not listed, see the troubleshooting note in [windows-vm-setup.md](windows-vm-setup.md) — the Twingate client must have authenticated and connected at least once.
+
+### Confirm a specific device by serial
+
+To confirm a single device by serial number:
+
+```bash
+python scripts/validate-trust.py \
+  --tenant your-tenant \
+  --api-key $TWINGATE_API_KEY \
+  --serial "YOUR-SERIAL-HERE" \
+  --expected untrusted
+```
+
+Output on success:
+
+```text
+PASS: Device "DESKTOP-ABC123" (serial: VMW-1234-5678) is untrusted=False as expected.
+  Twingate ID    : RGV2aWNlOjE2MzU4NA==
+  User           : you@example.com
+  Last connected : (never)
+```
+
+## Step 5: Verify the trust mutation
+
+Before adding any providers, confirm the bridge can actually call the `deviceUpdate` mutation and mark a device trusted. This isolates Twingate API issues from provider issues.
+
+```bash
+python scripts/test-trust-mutation.py \
+  --tenant your-tenant \
+  --api-key $TWINGATE_API_KEY \
+  --serial "YOUR-SERIAL-HERE"
+```
+
+Output on success:
+
+```text
+Found: 'DESKTOP-ABC123' (id=RGV2aWNlOjE2MzU4NA==, serial=VMW-1234-5678)
+Calling trust_device mutation...
+PASS: 'DESKTOP-ABC123' is now isTrusted=True
+```
+
+After running this, verify in the Admin Console that the device shows **Security: Device instance verified**. Then **manually untrust** the device before continuing (Admin Console > Devices > click device > Actions > **Remove Trust**) so it will be picked up by the bridge in a later step.
+
+If this step fails with a `403` or GraphQL error, check that the API key has **Devices: Write** scope (Step 3 above).
+
+## Step 6: Dry-run first pass
 
 Always do a dry run before running the bridge in live mode. This confirms the bridge can see the device and would trust it, without making any changes.
 
@@ -110,7 +148,7 @@ Always do a dry run before running the bridge in live mode. This confirms the br
 {"event": "device_would_trust", "action": "would_trust", "device_serial": "VMW-1234-5678", "twingate_device_id": "RGV2aWNlOjE2MzU4NA==", "provider": "jumpcloud", "level": "info", "timestamp": "2025-03-10T10:00:05Z"}
 ```
 
-## Step 6: Confirm trust after a live run
+## Step 7: Confirm trust after a live run
 
 After switching to `dry_run: false` and running the bridge:
 

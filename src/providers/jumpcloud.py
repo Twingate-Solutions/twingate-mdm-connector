@@ -20,6 +20,7 @@ log = structlog.get_logger()
 
 _API_BASE = "https://console.jumpcloud.com/api"
 _PAGE_LIMIT = 100
+_MAX_PAGES = 500
 
 
 class JumpCloudProvider(ProviderPlugin):
@@ -47,10 +48,7 @@ class JumpCloudProvider(ProviderPlugin):
         self._config = config
         self._client = build_client(
             base_url=_API_BASE,
-            headers={
-                "x-api-key": config.api_key,
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
         )
 
     async def authenticate(self) -> None:
@@ -72,12 +70,14 @@ class JumpCloudProvider(ProviderPlugin):
         """
         devices: list[ProviderDevice] = []
         skip = 0
+        auth_headers = {"x-api-key": self._config.api_key}
 
-        while True:
+        for _page_num in range(_MAX_PAGES):
             response = await request_with_retry(
                 self._client,
                 "GET",
                 "/systems",
+                headers=auth_headers,
                 params={"limit": _PAGE_LIMIT, "skip": skip},
             )
             response.raise_for_status()
@@ -103,6 +103,12 @@ class JumpCloudProvider(ProviderPlugin):
             skip += len(results)
             if skip >= total_count or len(results) < _PAGE_LIMIT:
                 break
+        else:
+            log.warning(
+                "JumpCloud pagination safety limit reached — results may be incomplete",
+                provider=self.name,
+                max_pages=_MAX_PAGES,
+            )
 
         log.info("JumpCloud systems fetched", provider=self.name, count=len(devices))
         return devices
