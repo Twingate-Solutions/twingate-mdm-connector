@@ -201,13 +201,24 @@ providers:
 #       schedule: "08:00"   # HH:MM
 #       timezone: UTC       # IANA timezone name
 
-  # HTTP webhooks — JSON POST with optional HMAC-SHA256 signing
-#   webhook:
-#     url: ${WEBHOOK_URL}
-#     secret: ${WEBHOOK_SECRET}       # optional — enables X-Hub-Signature-256 header
-#     timeout_seconds: 10
-#     # Which events to fire. Future events can be added without code changes.
-#     events:
-#       - device_trusted
-#       - provider_error
-#       - sync_complete
+  # HTTP webhooks — multiple destinations with platform-native formatting
+  # Each entry is an independent webhook destination.
+  # Built-in formats: raw | slack | teams | discord | pagerduty | opsgenie
+#   webhooks:
+#     - url: ${WEBHOOK_URL}
+#       format: raw                    # raw | slack | teams | discord | pagerduty | opsgenie
+#       secret: ${WEBHOOK_SECRET}      # optional — enables X-Hub-Signature-256 header
+#       timeout_seconds: 10
+#       # headers:                     # optional static request headers
+#       #   Authorization: "GenieKey ${OPSGENIE_KEY}"
+#       # templates_dir: /opt/custom-webhook-templates  # optional template override directory
+#       events:
+#         - device_trusted
+#         - provider_error
+#         - sync_complete
+#     # Example: second webhook to Slack
+#     # - url: ${SLACK_WEBHOOK_URL}
+#     #   format: slack
+#     #   events:
+#     #     - device_trusted
+#     #     - provider_error

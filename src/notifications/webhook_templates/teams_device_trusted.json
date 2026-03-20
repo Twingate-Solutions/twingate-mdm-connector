@@ -1,0 +1,18 @@
+{
+  "@type": "MessageCard",
+  "@context": "http://schema.org/extensions",
+  "themeColor": "00B300",
+  "summary": "Device Trusted: $device_hostname",
+  "sections": [{
+    "activityTitle": "Device Trusted",
+    "facts": [
+      {"name": "Device", "value": "$device_hostname"},
+      {"name": "Serial", "value": "$device_serial_masked"},
+      {"name": "OS", "value": "$device_os"},
+      {"name": "User", "value": "$device_user_email"},
+      {"name": "Provider(s)", "value": "$providers_matched"},
+      {"name": "Dry run", "value": "$dry_run"},
+      {"name": "Time", "value": "$timestamp"}
+    ]
+  }]
+}

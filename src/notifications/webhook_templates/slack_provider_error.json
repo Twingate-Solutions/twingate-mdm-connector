@@ -1,0 +1,3 @@
+{
+  "text": ":rotating_light: *Provider Error — $provider_name*\n*Error:* $error_message\n*Time:* $timestamp"
+}

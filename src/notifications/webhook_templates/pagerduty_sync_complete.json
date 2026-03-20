@@ -1,0 +1,18 @@
+{
+  "routing_key": "YOUR_INTEGRATION_KEY_HERE",
+  "event_action": "trigger",
+  "dedup_key": "sync-complete",
+  "payload": {
+    "summary": "Sync complete — trusted: $total_trusted, errors: $total_errors",
+    "severity": "info",
+    "source": "twingate-mdm-connector",
+    "custom_details": {
+      "total_trusted": "$total_trusted",
+      "total_skipped": "$total_skipped",
+      "total_no_match": "$total_no_match",
+      "total_errors": "$total_errors",
+      "providers": "$provider_names",
+      "timestamp": "$timestamp"
+    }
+  }
+}

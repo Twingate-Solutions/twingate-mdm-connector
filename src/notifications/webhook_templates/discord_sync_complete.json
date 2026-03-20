@@ -1,0 +1,14 @@
+{
+  "embeds": [{
+    "title": "Sync Complete",
+    "color": 3447003,
+    "fields": [
+      {"name": "Trusted", "value": "$total_trusted", "inline": true},
+      {"name": "Skipped", "value": "$total_skipped", "inline": true},
+      {"name": "No match", "value": "$total_no_match", "inline": true},
+      {"name": "Errors", "value": "$total_errors", "inline": true},
+      {"name": "Provider(s)", "value": "$provider_names"}
+    ],
+    "footer": {"text": "$timestamp"}
+  }]
+}

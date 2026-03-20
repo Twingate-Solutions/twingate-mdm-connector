@@ -75,7 +75,7 @@ class TestNotificationsConfig:
     def test_both_optional(self) -> None:
         cfg = NotificationsConfig()
         assert cfg.smtp is None
-        assert cfg.webhook is None
+        assert cfg.webhooks == []
 
 
 class TestAppConfigNotifications:
@@ -83,11 +83,12 @@ class TestAppConfigNotifications:
         cfg = AppConfig(twingate=TwingateConfig(tenant="t", api_key="k"))
         assert cfg.notifications is None
 
-    def test_notifications_webhook_present(self) -> None:
+    def test_notifications_webhooks_present(self) -> None:
         cfg = AppConfig(
             twingate=TwingateConfig(tenant="t", api_key="k"),
             notifications=NotificationsConfig(
-                webhook=WebhookConfig(url="https://hooks.example.com/x")
+                webhooks=[WebhookConfig(url="https://hooks.example.com/x")]
             ),
         )
-        assert cfg.notifications.webhook is not None
+        assert len(cfg.notifications.webhooks) == 1
+        assert cfg.notifications.webhooks[0].url == "https://hooks.example.com/x"

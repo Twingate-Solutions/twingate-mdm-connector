@@ -189,7 +189,7 @@ class TestBuildNotifier:
 
     def test_returns_null_notifier_when_no_channels_configured(self) -> None:
         from src.notifications.base import NullNotifier
-        cfg = self._minimal_app_config(notifications={"smtp": None, "webhook": None})
+        cfg = self._minimal_app_config(notifications={"smtp": None, "webhooks": []})
         result = build_notifier(cfg)
         assert isinstance(result, NullNotifier)
 
@@ -199,7 +199,7 @@ class TestBuildNotifier:
         assert isinstance(result, CompositeNotifier)
 
     def test_returns_composite_with_webhook_channel(self) -> None:
-        cfg = self._minimal_app_config(notifications={"webhook": {"url": "https://hooks.example.com/"}})
+        cfg = self._minimal_app_config(notifications={"webhooks": [{"url": "https://hooks.example.com/"}]})
         result = build_notifier(cfg)
         assert isinstance(result, CompositeNotifier)
 

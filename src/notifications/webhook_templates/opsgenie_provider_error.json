@@ -1,0 +1,10 @@
+{
+  "message": "Provider error: $provider_name",
+  "alias": "provider-error-$provider_name",
+  "description": "$error_message",
+  "priority": "P2",
+  "details": {
+    "provider": "$provider_name",
+    "error": "$error_message"
+  }
+}

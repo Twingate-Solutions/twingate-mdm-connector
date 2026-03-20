@@ -117,6 +117,17 @@ class WebhookConfig(BaseModel):
     The ``events`` list controls which event types fire a webhook POST.
     Future event types are supported without schema changes — just add the
     new event name string to this list.
+
+    The ``format`` field selects the payload shape.  ``raw`` (the default)
+    produces the original structured JSON.  Any other value (e.g. ``slack``,
+    ``teams``, ``discord``, ``pagerduty``, ``opsgenie``) loads a bundled
+    JSON template that is rendered with ``string.Template`` substitution.
+
+    ``headers`` lets admins inject static HTTP headers (e.g. an
+    ``Authorization`` header for OpsGenie or PagerDuty).
+
+    ``templates_dir`` overrides the bundled template directory — drop custom
+    ``{format}_{event_type}.json`` files there to tailor payloads.
     """
 
     url: str
@@ -125,13 +136,16 @@ class WebhookConfig(BaseModel):
         default_factory=lambda: ["device_trusted", "provider_error", "sync_complete"]
     )
     timeout_seconds: int = 10
+    format: str = "raw"
+    headers: dict[str, str] | None = None
+    templates_dir: str | None = None
 
 
 class NotificationsConfig(BaseModel):
     """Top-level notifications block.  Both channels are independently optional."""
 
     smtp: SmtpConfig | None = None
-    webhook: WebhookConfig | None = None
+    webhooks: list[WebhookConfig] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

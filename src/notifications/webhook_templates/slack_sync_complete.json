@@ -1,0 +1,3 @@
+{
+  "text": ":bar_chart: *Sync Complete*\nTrusted: *$total_trusted* | Skipped: *$total_skipped* | No match: *$total_no_match* | Errors: *$total_errors*\n*Provider(s):* $provider_names\n*Time:* $timestamp"
+}

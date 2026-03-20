@@ -1,0 +1,17 @@
+{
+  "@type": "MessageCard",
+  "@context": "http://schema.org/extensions",
+  "themeColor": "0078D4",
+  "summary": "Sync Complete",
+  "sections": [{
+    "activityTitle": "Sync Complete",
+    "facts": [
+      {"name": "Trusted", "value": "$total_trusted"},
+      {"name": "Skipped", "value": "$total_skipped"},
+      {"name": "No match", "value": "$total_no_match"},
+      {"name": "Errors", "value": "$total_errors"},
+      {"name": "Provider(s)", "value": "$provider_names"},
+      {"name": "Time", "value": "$timestamp"}
+    ]
+  }]
+}
