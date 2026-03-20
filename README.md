@@ -31,6 +31,38 @@ Datto RMM ─────────┤
 Rippling  ─────────┘
 ```
 
+## Feature rollout
+
+Support for providers and third-party integrations is being added and validated over time. Unless marked as tested below, a feature may be implemented but not yet verified against a live instance — behaviour may differ from what the docs describe.
+
+### MDM / EDR providers
+
+| Provider | Type | Tested |
+| -------- | ---- | :----: |
+| NinjaOne | MDM / RMM | ✅ |
+| ManageEngine Endpoint Central (cloud) | MDM / RMM | ✅ |
+| ManageEngine Endpoint Central (on-prem) | MDM / RMM | |
+| Sophos Central | EDR | |
+| Automox | RMM | |
+| JumpCloud | MDM / IAM | |
+| FleetDM | MDM | |
+| Mosyle | MDM (Apple) | |
+| Datto RMM | RMM | |
+| Rippling | HR / IT | |
+
+### Webhook destinations
+
+| Destination | Format | Tested |
+| ----------- | ------ | :----: |
+| Slack | `slack` | ✅ |
+| Generic JSON / SIEM | `raw` | ✅ |
+| Microsoft Teams | `teams` | |
+| Discord | `discord` | |
+| PagerDuty | `pagerduty` | |
+| OpsGenie | `opsgenie` | |
+
+---
+
 ## Quick start
 
 ### 1. Create a config file
@@ -97,18 +129,18 @@ services:
 
 ## Supported providers
 
-| Provider | Auth | Tested | Docs |
-| -------- | ---- | :----: | ---- |
-| NinjaOne | OAuth2 client credentials | ✓ | [docs/providers/ninjaone.md](docs/providers/ninjaone.md) |
-| Sophos | OAuth2 client credentials + tenant discovery | | [docs/providers/sophos.md](docs/providers/sophos.md) |
-| ManageEngine (cloud) | Zoho OAuth2 | ✓ | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
-| ManageEngine (on-prem) | API token | | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
-| Automox | API key | | [docs/providers/automox.md](docs/providers/automox.md) |
-| JumpCloud | API key | | [docs/providers/jumpcloud.md](docs/providers/jumpcloud.md) |
-| FleetDM | Bearer token | | [docs/providers/fleetdm.md](docs/providers/fleetdm.md) |
-| Mosyle | Access token + email + password | | [docs/providers/mosyle.md](docs/providers/mosyle.md) |
-| Datto RMM | OAuth2 client credentials | | [docs/providers/datto.md](docs/providers/datto.md) |
-| Rippling | OAuth2 client credentials | | [docs/providers/rippling.md](docs/providers/rippling.md) |
+| Provider | Auth | Docs |
+| -------- | ---- | ---- |
+| NinjaOne | OAuth2 client credentials | [docs/providers/ninjaone.md](docs/providers/ninjaone.md) |
+| Sophos | OAuth2 client credentials + tenant discovery | [docs/providers/sophos.md](docs/providers/sophos.md) |
+| ManageEngine (cloud) | Zoho OAuth2 | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
+| ManageEngine (on-prem) | API token | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
+| Automox | API key | [docs/providers/automox.md](docs/providers/automox.md) |
+| JumpCloud | API key | [docs/providers/jumpcloud.md](docs/providers/jumpcloud.md) |
+| FleetDM | Bearer token | [docs/providers/fleetdm.md](docs/providers/fleetdm.md) |
+| Mosyle | Access token + email + password | [docs/providers/mosyle.md](docs/providers/mosyle.md) |
+| Datto RMM | OAuth2 client credentials | [docs/providers/datto.md](docs/providers/datto.md) |
+| Rippling | OAuth2 client credentials | [docs/providers/rippling.md](docs/providers/rippling.md) |
 
 ## Sync behaviour
 
@@ -191,17 +223,17 @@ Serial numbers in all emails are partially masked (`****1234`) to avoid leaking 
 
 ### HTTP Webhooks
 
-Signed JSON POST requests fired for configurable event types:
+Send signed JSON POST requests to multiple destinations with platform-native formatting. Configure one or more webhook entries under `notifications.webhooks`:
 
-- `device_trusted` — fired per device when `isTrusted: true` is set
-- `provider_error` — fired when a provider fails for a cycle
-- `sync_complete` — fired at the end of each cycle with aggregate stats
-
-Optional HMAC-SHA256 payload signing via a shared secret (`X-Hub-Signature-256` header).
+- **Multiple destinations** — send the same events to your SIEM, a Slack channel, and a PagerDuty service simultaneously
+- **Built-in formats** — `raw` (structured JSON), `slack`, `teams`, `discord`, `pagerduty`, `opsgenie`
+- **Custom templates** — drop `{format}_{event_type}.json` files in a `templates_dir` to tailor payloads for any platform
+- **HMAC-SHA256 signing** — optional payload signing via a shared secret (`X-Hub-Signature-256` header)
+- **Custom headers** — inject static HTTP headers (e.g. `Authorization` for OpsGenie)
 
 Both channels support future event types (e.g., untrust events) without config schema changes — admins add the event name to the `events` list in `config.yaml`.
 
-See [docs/configuration.md](docs/configuration.md) for the full `notifications:` reference.
+See [docs/notifications.md](docs/notifications.md) for the full notifications reference and [docs/configuration.md](docs/configuration.md) for the config schema.
 
 ## License
 

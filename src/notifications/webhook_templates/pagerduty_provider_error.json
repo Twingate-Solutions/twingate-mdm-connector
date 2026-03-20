@@ -1,0 +1,15 @@
+{
+  "routing_key": "YOUR_INTEGRATION_KEY_HERE",
+  "event_action": "trigger",
+  "dedup_key": "provider-error-$provider_name",
+  "payload": {
+    "summary": "Provider error: $provider_name — $error_message",
+    "severity": "error",
+    "source": "twingate-mdm-connector",
+    "custom_details": {
+      "provider": "$provider_name",
+      "error": "$error_message",
+      "timestamp": "$timestamp"
+    }
+  }
+}

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.config import WebhookConfig
+from src.config import NotificationsConfig, WebhookConfig
 from src.notifications.base import ProviderErrorEvent, SyncCompleteEvent, TrustEvent
 from src.notifications.webhook import WebhookNotifier
 
@@ -25,6 +25,9 @@ def _wh_cfg(**overrides) -> WebhookConfig:
         secret=None,
         events=["device_trusted", "provider_error", "sync_complete"],
         timeout_seconds=10,
+        format="raw",
+        headers=None,
+        templates_dir=None,
     )
     defaults.update(overrides)
     return WebhookConfig.model_validate(defaults)
@@ -174,3 +177,132 @@ class TestPayloadSchema:
         assert p["device"]["user_email"] == "user@example.com"
         assert p["result"]["trusted"] is True
         assert p["result"]["dry_run"] is False
+
+
+class TestWebhookTemplates:
+    @pytest.mark.asyncio
+    async def test_slack_format_sends_slack_payload(self, trust_event: TrustEvent) -> None:
+        """Slack format renders a slack-shaped payload."""
+        notifier = WebhookNotifier(_wh_cfg(format="slack"))
+        captured: list[dict] = []
+
+        async def capture(client, method, url, **kwargs):
+            captured.append(json.loads(kwargs["content"]))
+            return AsyncMock(status_code=200)
+
+        with patch("src.notifications.webhook.request_with_retry", side_effect=capture):
+            await notifier.on_device_trusted(trust_event)
+
+        assert "text" in captured[0]
+        assert "CORP-01" in captured[0]["text"]
+
+    @pytest.mark.asyncio
+    async def test_teams_format_sends_message_card(self, trust_event: TrustEvent) -> None:
+        """Teams format renders a MessageCard payload."""
+        notifier = WebhookNotifier(_wh_cfg(format="teams"))
+        captured: list[dict] = []
+
+        async def capture(client, method, url, **kwargs):
+            captured.append(json.loads(kwargs["content"]))
+            return AsyncMock(status_code=200)
+
+        with patch("src.notifications.webhook.request_with_retry", side_effect=capture):
+            await notifier.on_device_trusted(trust_event)
+
+        assert captured[0]["@type"] == "MessageCard"
+        assert "CORP-01" in captured[0]["summary"]
+
+    @pytest.mark.asyncio
+    async def test_discord_format_sends_embeds(self, sync_event: SyncCompleteEvent) -> None:
+        """Discord format renders an embeds payload."""
+        notifier = WebhookNotifier(_wh_cfg(format="discord"))
+        captured: list[dict] = []
+
+        async def capture(client, method, url, **kwargs):
+            captured.append(json.loads(kwargs["content"]))
+            return AsyncMock(status_code=200)
+
+        with patch("src.notifications.webhook.request_with_retry", side_effect=capture):
+            await notifier.on_sync_complete(sync_event)
+
+        assert "embeds" in captured[0]
+
+    @pytest.mark.asyncio
+    async def test_custom_headers_sent(self, trust_event: TrustEvent) -> None:
+        """Custom static headers are included in the request."""
+        notifier = WebhookNotifier(_wh_cfg(headers={"Authorization": "GenieKey abc123"}))
+        captured: list[dict] = []
+
+        async def capture(client, method, url, **kwargs):
+            captured.append(kwargs)
+            return AsyncMock(status_code=200)
+
+        with patch("src.notifications.webhook.request_with_retry", side_effect=capture):
+            await notifier.on_device_trusted(trust_event)
+
+        assert captured[0]["headers"]["Authorization"] == "GenieKey abc123"
+
+    @pytest.mark.asyncio
+    async def test_custom_headers_with_hmac(self, trust_event: TrustEvent) -> None:
+        """Custom headers coexist with HMAC signing."""
+        notifier = WebhookNotifier(
+            _wh_cfg(secret="s3cret", headers={"X-Custom": "value"})
+        )
+        captured: list[dict] = []
+
+        async def capture(client, method, url, **kwargs):
+            captured.append(kwargs)
+            return AsyncMock(status_code=200)
+
+        with patch("src.notifications.webhook.request_with_retry", side_effect=capture):
+            await notifier.on_device_trusted(trust_event)
+
+        headers = captured[0]["headers"]
+        assert headers["X-Custom"] == "value"
+        assert "X-Hub-Signature-256" in headers
+
+    def test_load_webhook_template_bundled(self) -> None:
+        """Bundled slack template loads successfully."""
+        from src.notifications.webhook import load_webhook_template
+        text = load_webhook_template("slack", "device_trusted", None)
+        assert "$device_hostname" in text
+
+    def test_load_webhook_template_unknown_format_raises(self) -> None:
+        """Unknown format raises FileNotFoundError."""
+        from src.notifications.webhook import load_webhook_template
+        with pytest.raises(FileNotFoundError):
+            load_webhook_template("nonexistent_format", "device_trusted", None)
+
+    def test_load_webhook_template_custom_dir_takes_priority(self, tmp_path) -> None:
+        """User templates_dir overrides bundled templates."""
+        from src.notifications.webhook import load_webhook_template
+        custom = tmp_path / "slack_device_trusted.json"
+        custom.write_text('{"text": "custom $device_hostname"}', encoding="utf-8")
+        text = load_webhook_template("slack", "device_trusted", str(tmp_path))
+        assert "custom" in text
+
+
+class TestNotificationsConfig:
+    def test_webhooks_is_list(self) -> None:
+        """webhooks field accepts a list of WebhookConfig entries."""
+        cfg = NotificationsConfig.model_validate({
+            "webhooks": [
+                {"url": "https://a.example.com", "format": "slack"},
+                {"url": "https://b.example.com", "format": "teams"},
+            ]
+        })
+        assert len(cfg.webhooks) == 2
+        assert cfg.webhooks[0].format == "slack"
+        assert cfg.webhooks[1].format == "teams"
+
+    def test_webhooks_defaults_to_empty_list(self) -> None:
+        """webhooks defaults to an empty list when omitted."""
+        cfg = NotificationsConfig.model_validate({})
+        assert cfg.webhooks == []
+
+    def test_webhook_config_defaults(self) -> None:
+        """New WebhookConfig fields have sensible defaults."""
+        cfg = WebhookConfig.model_validate({"url": "https://example.com"})
+        assert cfg.format == "raw"
+        assert cfg.headers is None
+        assert cfg.templates_dir is None

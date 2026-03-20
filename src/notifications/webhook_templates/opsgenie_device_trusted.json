@@ -1,0 +1,14 @@
+{
+  "message": "Device trusted: $device_hostname",
+  "alias": "device-trusted-$device_serial_masked",
+  "description": "Device $device_hostname ($device_serial_masked) trusted via $providers_matched",
+  "priority": "P5",
+  "details": {
+    "device": "$device_hostname",
+    "serial": "$device_serial_masked",
+    "os": "$device_os",
+    "user": "$device_user_email",
+    "providers_matched": "$providers_matched",
+    "dry_run": "$dry_run"
+  }
+}

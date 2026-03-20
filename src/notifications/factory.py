@@ -94,7 +94,7 @@ def build_notifier(
 
     Returns a :class:`~src.notifications.base.NullNotifier` when:
     - The ``notifications`` config block is absent
-    - Both channels (smtp and webhook) are ``None``
+    - Both channels (smtp and webhooks) are empty/absent
 
     Otherwise returns a :class:`CompositeNotifier` with each enabled channel
     as a child notifier.
@@ -123,9 +123,9 @@ def build_notifier(
             children.append(_AccumulatorAdapter(accumulator))
             logger.info("Digest accumulator wired into notifier")
 
-    if notif.webhook is not None:
+    for wh_cfg in notif.webhooks:
         from src.notifications.webhook import WebhookNotifier
-        children.append(WebhookNotifier(notif.webhook))
+        children.append(WebhookNotifier(wh_cfg))
 
     if not children:
         return NullNotifier()

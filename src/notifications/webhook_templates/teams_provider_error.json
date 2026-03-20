@@ -1,0 +1,14 @@
+{
+  "@type": "MessageCard",
+  "@context": "http://schema.org/extensions",
+  "themeColor": "FF0000",
+  "summary": "Provider Error: $provider_name",
+  "sections": [{
+    "activityTitle": "Provider Error",
+    "facts": [
+      {"name": "Provider", "value": "$provider_name"},
+      {"name": "Error", "value": "$error_message"},
+      {"name": "Time", "value": "$timestamp"}
+    ]
+  }]
+}

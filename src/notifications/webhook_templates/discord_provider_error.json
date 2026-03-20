@@ -1,0 +1,11 @@
+{
+  "embeds": [{
+    "title": "Provider Error — $provider_name",
+    "color": 15158332,
+    "fields": [
+      {"name": "Provider", "value": "$provider_name", "inline": true},
+      {"name": "Error", "value": "$error_message"}
+    ],
+    "footer": {"text": "$timestamp"}
+  }]
+}

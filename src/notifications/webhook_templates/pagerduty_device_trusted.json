@@ -1,0 +1,19 @@
+{
+  "routing_key": "YOUR_INTEGRATION_KEY_HERE",
+  "event_action": "trigger",
+  "dedup_key": "device-trusted-$device_serial_masked",
+  "payload": {
+    "summary": "Device trusted: $device_hostname ($device_serial_masked)",
+    "severity": "info",
+    "source": "twingate-mdm-connector",
+    "custom_details": {
+      "device": "$device_hostname",
+      "serial": "$device_serial_masked",
+      "os": "$device_os",
+      "user": "$device_user_email",
+      "providers_matched": "$providers_matched",
+      "dry_run": "$dry_run",
+      "timestamp": "$timestamp"
+    }
+  }
+}

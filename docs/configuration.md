@@ -448,16 +448,53 @@ syntax. Variables available in each template are listed in the file's comments.
 
 **Note:** Daily digest statistics reset on container restart.
 
-### `notifications.webhook`
+### `notifications.webhooks`
+
+A list of webhook destinations. Each entry fires independently. You can send the same events to multiple endpoints with different formats (e.g. raw JSON to your SIEM and Slack-formatted payloads to a channel).
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `url` | string | required | POST target URL. Use `${WEBHOOK_URL}` |
+| `format` | string | `raw` | Payload format: `raw` (structured JSON), `slack`, `teams`, `discord`, `pagerduty`, `opsgenie` |
 | `secret` | string | `null` | HMAC-SHA256 shared secret. Adds `X-Hub-Signature-256` header |
 | `events` | list[string] | `[device_trusted, provider_error, sync_complete]` | Event types to fire |
 | `timeout_seconds` | int | `10` | Per-request timeout |
+| `headers` | dict[string, string] | `null` | Custom static HTTP headers added to every request (e.g. `Authorization` for OpsGenie) |
+| `templates_dir` | string | `null` | Path to a directory with custom `{format}_{event_type}.json` templates. Overrides bundled templates when a matching file exists |
 
-**Payload example (`device_trusted`):**
+**Built-in formats:**
+
+| Format | Target platform | Notes |
+| --- | --- | --- |
+| `raw` | Any JSON endpoint / SIEM | Original structured JSON — backward-compatible with v1 payloads |
+| `slack` | Slack Incoming Webhooks | Uses `text` field with mrkdwn formatting |
+| `teams` | Microsoft Teams Incoming Webhooks | MessageCard format |
+| `discord` | Discord Webhooks | Uses `embeds` array with colour-coded cards |
+| `pagerduty` | PagerDuty Events API v2 | Copy bundled template to `templates_dir` to insert your `routing_key` |
+| `opsgenie` | OpsGenie Alerts API | Add `headers: {Authorization: "GenieKey YOUR_KEY"}` in config |
+
+**Example — multiple destinations:**
+
+```yaml
+notifications:
+  webhooks:
+    - url: ${WEBHOOK_URL}
+      format: raw
+      secret: ${WEBHOOK_SECRET}
+      events:
+        - device_trusted
+        - provider_error
+        - sync_complete
+    - url: ${SLACK_WEBHOOK_URL}
+      format: slack
+      events:
+        - device_trusted
+        - provider_error
+```
+
+**Custom templates:** Create a `{format}_{event_type}.json` file in your `templates_dir` directory. Templates use Python `string.Template` `$variable` syntax. See [docs/notifications.md](notifications.md) for the full variable reference per event type.
+
+**Raw payload example (`device_trusted`):**
 
 ```json
 {

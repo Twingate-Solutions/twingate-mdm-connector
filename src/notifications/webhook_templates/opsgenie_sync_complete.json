@@ -1,0 +1,13 @@
+{
+  "message": "Sync complete — $total_trusted trusted, $total_errors errors",
+  "alias": "sync-complete",
+  "description": "Sync completed. Trusted: $total_trusted, Skipped: $total_skipped, No match: $total_no_match, Errors: $total_errors. Providers: $provider_names",
+  "priority": "P5",
+  "details": {
+    "total_trusted": "$total_trusted",
+    "total_skipped": "$total_skipped",
+    "total_no_match": "$total_no_match",
+    "total_errors": "$total_errors",
+    "providers": "$provider_names"
+  }
+}

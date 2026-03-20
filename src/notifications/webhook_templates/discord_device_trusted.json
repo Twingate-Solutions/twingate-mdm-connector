@@ -1,0 +1,15 @@
+{
+  "embeds": [{
+    "title": "Device Trusted",
+    "color": 3066993,
+    "fields": [
+      {"name": "Device", "value": "$device_hostname", "inline": true},
+      {"name": "Serial", "value": "$device_serial_masked", "inline": true},
+      {"name": "OS", "value": "$device_os", "inline": true},
+      {"name": "User", "value": "$device_user_email", "inline": true},
+      {"name": "Provider(s)", "value": "$providers_matched", "inline": true},
+      {"name": "Dry run", "value": "$dry_run", "inline": true}
+    ],
+    "footer": {"text": "$timestamp"}
+  }]
+}
