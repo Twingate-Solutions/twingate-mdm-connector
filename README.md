@@ -57,7 +57,7 @@ Support for providers and third-party integrations is being added and validated 
 | Slack | `slack` | ✅ |
 | Generic JSON / SIEM | `raw` | ✅ |
 | Microsoft Teams | `teams` | |
-| Discord | `discord` | |
+| Discord | `discord` | ✅ |
 | PagerDuty | `pagerduty` | |
 | OpsGenie | `opsgenie` | |
 
