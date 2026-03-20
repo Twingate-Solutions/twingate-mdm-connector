@@ -44,7 +44,7 @@ Support for providers and third-party integrations is being added and validated 
 | ManageEngine Endpoint Central (on-prem) | MDM / RMM | |
 | Sophos Central | EDR | |
 | Automox | RMM | |
-| JumpCloud | MDM / IAM | |
+| JumpCloud | MDM / IAM | ✅ |
 | FleetDM | MDM | |
 | Mosyle | MDM (Apple) | |
 | Datto RMM | RMM | |
