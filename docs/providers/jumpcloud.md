@@ -21,8 +21,8 @@ JumpCloud uses a single API key per admin account. There is no scope granularity
 ### Option A — Personal API key (quickest for testing)
 
 1. Log in to the JumpCloud Admin Console at [https://console.jumpcloud.com/](https://console.jumpcloud.com/).
-2. Click your **avatar / initials** in the top-right corner.
-3. Select **My API Key** from the dropdown menu.
+2. Click your **avatar / initials** in the **bottom-left corner**.
+3. Select **My API Key** from the menu.
 4. Click **Show API Key** and copy the value.
 
 ### Option B — Dedicated service account (recommended for production)
@@ -30,7 +30,7 @@ JumpCloud uses a single API key per admin account. There is no scope granularity
 1. In the JumpCloud Admin Console, go to **User Management → Users**.
 2. Click **+ (Add User)** and create a new admin user (e.g. `svc-twingate-connector@yourdomain.com`). Set a strong password and mark the account as an Administrator.
 3. Log in to JumpCloud as that service account in a separate browser session (or incognito window).
-4. Follow Option A steps 2–4 above to retrieve the API key for that account.
+4. Follow Option A steps 2–4 above (click the avatar in the bottom-left) to retrieve the API key for that account.
 5. Keep the service account credentials in a password manager; you only need the API key for this connector.
 
 > **Security note:** There is currently no way to create a read-only API key in JumpCloud. The API key has full admin privileges. Treat it as a highly sensitive secret and rotate it if it is ever exposed.
