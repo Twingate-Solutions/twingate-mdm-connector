@@ -1,7 +1,7 @@
 # Twingate MDM Connector
 
 > **Community project — not affiliated with or supported by Twingate.**
-> This project is an independent, community-built tool. It is not created, endorsed, or maintained by Twingate, Inc. Twingate's support team cannot assist with issues related to this connector. Please use the [issue tracker](../../issues) for bug reports and questions.
+> This project is an experimental, proof of concept tool. It is meant as an example or a starting point for users who want to build something of similar functionality themselves. While Twingate's support team cannot assist with issues related to this connector, best efforts will be made to resolve any issues reported. Please use the [issue tracker](../../issues) for bug reports and questions.
 >
 > This software is provided under the [Apache License 2.0](LICENSE) — without warranty of any kind, express or implied. Use in production environments is at your own discretion and risk. See the license for the full disclaimer of warranties and limitation of liability.
 >
