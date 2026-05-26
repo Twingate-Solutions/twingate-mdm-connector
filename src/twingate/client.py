@@ -56,6 +56,7 @@ query GetUntrustedDevices($after: String, $first: Int) {
         isTrusted
         activeState
         lastConnectedAt
+        deviceType
         user {
           email
         }

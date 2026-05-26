@@ -35,7 +35,10 @@ class SyncConfig(BaseModel):
 
     interval_seconds: int = 300
     dry_run: bool = False
-    batch_size: int = 50
+    # Twingate-list pagination size AND maximum concurrent in-flight trust
+    # mutations.  Must be >= 1 — a value of 0 would deadlock the mutation phase
+    # (asyncio.Semaphore(0) never releases).
+    batch_size: int = Field(default=50, ge=1)
 
 
 class MatchingConfig(BaseModel):
@@ -288,6 +291,66 @@ class RipplingConfig(BaseModel):
     client_secret: str
 
 
+# ---------------------------------------------------------------------------
+# Manual (evaluator-archetype) provider
+# ---------------------------------------------------------------------------
+
+
+ManualField = Literal[
+    "hostname", "serial_number", "os_name", "os_version",
+    "name", "username", "user_email", "device_type",
+]
+ManualCheck = Literal[
+    "equals", "starts_with", "ends_with", "contains",
+    "regex", "in", "not_in",
+]
+
+
+class ManualRuleConfig(BaseModel):
+    """A single rule inside a ManualConfig.rules list."""
+
+    field: ManualField
+    check: ManualCheck
+    value: str | list[str]
+
+    @model_validator(mode="after")
+    def _check_value_shape(self) -> "ManualRuleConfig":
+        if self.check in ("in", "not_in"):
+            if not isinstance(self.value, list):
+                raise ValueError(
+                    f"check={self.check!r} requires value to be a list of strings"
+                )
+        else:
+            if not isinstance(self.value, str):
+                raise ValueError(
+                    f"check={self.check!r} requires value to be a string"
+                )
+        if self.check == "regex":
+            # Compile with the same flags ManualProvider uses at match time so
+            # validation rejects exactly the patterns runtime would reject.
+            try:
+                re.compile(self.value, flags=re.IGNORECASE)
+            except re.error as exc:
+                raise ValueError(
+                    f"invalid regex for field={self.field!r}: {exc}"
+                ) from exc
+        return self
+
+
+class ManualConfig(BaseModel):
+    """Manual (evaluator-archetype) provider configuration.
+
+    Rules are evaluated against the Twingate device record directly.  The
+    provider does not fetch any external inventory.
+    """
+
+    type: Literal["manual"]
+    enabled: bool = False
+    name: str = Field(min_length=1, max_length=64)
+    match_mode: Literal["all", "any"] = "all"
+    rules: list[ManualRuleConfig] = Field(min_length=1)
+
+
 # Discriminated union of all provider config types
 ProviderConfig = Annotated[
     NinjaOneConfig
@@ -298,7 +361,8 @@ ProviderConfig = Annotated[
     | FleetDMConfig
     | MosyleConfig
     | DattoConfig
-    | RipplingConfig,
+    | RipplingConfig
+    | ManualConfig,
     Field(discriminator="type"),
 ]
 
@@ -323,6 +387,29 @@ class AppConfig(BaseModel):
     def enabled_providers(self) -> list[ProviderConfig]:
         """Return only the providers with ``enabled: true``."""
         return [p for p in self.providers if p.enabled]
+
+    @model_validator(mode="after")
+    def _check_unique_provider_names(self) -> "AppConfig":
+        """Reject configs where two providers share the same effective name.
+
+        Inventory providers use their hardcoded class name (e.g. ``"jumpcloud"``);
+        manual providers use the configured ``name`` field.  Duplicate names
+        would silently overwrite each other in the engine's per-provider
+        indices and stats map.
+        """
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for p in self.providers:
+            effective = p.name if isinstance(p, ManualConfig) else p.type
+            if effective in seen:
+                duplicates.add(effective)
+            seen.add(effective)
+        if duplicates:
+            raise ValueError(
+                f"duplicate provider name(s) in providers list: "
+                f"{sorted(duplicates)}"
+            )
+        return self
 
 
 # ---------------------------------------------------------------------------

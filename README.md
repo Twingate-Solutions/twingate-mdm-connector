@@ -49,6 +49,7 @@ Support for providers and third-party integrations is being added and validated 
 | Mosyle | MDM (Apple) | |
 | Datto RMM | RMM | |
 | Rippling | HR / IT | |
+| Manual (rules-only, no MDM) | Evaluator | ✅ |
 
 ### Webhook destinations
 
@@ -141,6 +142,7 @@ services:
 | Mosyle | Access token + email + password | [docs/providers/mosyle.md](docs/providers/mosyle.md) |
 | Datto RMM | OAuth2 client credentials | [docs/providers/datto.md](docs/providers/datto.md) |
 | Rippling | OAuth2 client credentials | [docs/providers/rippling.md](docs/providers/rippling.md) |
+| Manual (no MDM) | Rule-based — no external API; matches Twingate-observed attributes | [docs/configuration.md#manual](docs/configuration.md#manual) |
 
 ## Sync behaviour
 
@@ -155,6 +157,8 @@ Each sync cycle follows a fetch-everything-first, compare-in-memory approach:
 4. **In-memory match** — for each untrusted Twingate device, the connector looks up its serial number in each provider's index. No further API calls are made during this phase.
 
 5. **Trust mutations** — devices that pass the trust check receive a `deviceUpdate` mutation. Failures are logged and skipped; they do not stop the cycle.
+
+**Manual / evaluator providers** are queried differently: rather than fetching an inventory, they are called once per untrusted Twingate device and decide on the spot whether to claim it based on the device's attributes (hostname, user email, OS, etc.). See the [manual provider docs](docs/configuration.md#manual) for the rule syntax.
 
 **Scale note:** this design works well for typical fleet sizes. All device records for all providers are held in memory simultaneously during matching. Each record is lightweight (a handful of strings), so even a fleet of 10,000 devices per provider adds only a few MB of RAM. If your fleet is significantly larger than that, consider filing an issue — a streaming/chunked approach could be added.
 
