@@ -40,7 +40,7 @@ Scheduler and sync loop behaviour.
 |---|---|---|---|
 | `interval_seconds` | int | `300` | How often to run a full sync cycle, in seconds |
 | `dry_run` | bool | `false` | When `true`, log trust decisions without calling the `deviceUpdate` mutation. Use this to verify matching before a live run |
-| `batch_size` | int | `50` | Number of devices to fetch per GraphQL pagination page when querying Twingate |
+| `batch_size` | int (≥1) | `50` | Two uses: (1) page size when querying Twingate's untrusted devices, and (2) the maximum number of concurrent in-flight `deviceUpdate` mutations per cycle |
 
 ```yaml
 sync:
@@ -310,6 +310,90 @@ Apple devices only (macOS, iOS, iPadOS).
   client_id: ${RIPPLING_CLIENT_ID}
   client_secret: ${RIPPLING_CLIENT_SECRET}
 ```
+
+---
+
+### `manual`
+
+The **manual** provider is an *evaluator-archetype* provider — it does not call any external MDM/EDR. Instead, it evaluates a list of rules against Twingate's own device record and trusts devices that match. Use it for:
+
+- Fleets with no MDM, where trust should be based on Twingate-observed attributes (hostname pattern, user email, OS, …).
+- Ephemeral / on-demand VDI workstations that are spun up at runtime and never registered in an MDM.
+
+Multiple manual blocks are supported; each one is treated as an independent contributor in trust evaluation (you compose OR-of-rule-sets by adding multiple blocks).
+
+| Key | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `type` | `"manual"` | Yes | — | Provider type identifier |
+| `enabled` | bool | No | `false` | Enable this provider |
+| `name` | string (1–64 chars) | Yes | — | Logical name used in logs and notification payloads. Must be unique across all providers (including the hardcoded names of inventory providers like `jumpcloud`, `ninjaone`). |
+| `match_mode` | `all` \| `any` | No | `all` | `all`: every rule must match. `any`: at least one rule must match |
+| `rules` | list of rule objects | Yes (≥1) | — | Rule set — see below |
+
+Each rule object has:
+
+| Key | Type | Description |
+|---|---|---|
+| `field` | enum | One of: `hostname`, `serial_number`, `os_name`, `os_version`, `name`, `username`, `user_email`, `device_type` |
+| `check` | enum | One of: `equals`, `starts_with`, `ends_with`, `contains`, `regex`, `in`, `not_in` |
+| `value` | string or list of strings | Pattern to match. `in` / `not_in` require a list; everything else requires a string |
+
+**Field reference:**
+
+- `hostname` — Twingate's `hostname` field for the device.
+- `serial_number` — the raw serial number reported by Twingate.
+- `os_name` — operating system name, e.g. `Windows 10`, `macOS`.
+- `os_version` — OS version string.
+- `name` — Twingate's display name for the device.
+- `username` — last-logged-in username Twingate reports.
+- `user_email` — primary user's email from Twingate's user record.
+- `device_type` — Twingate's device type enum: `LAPTOP`, `DESKTOP`, `MOBILE`, `OTHER` (or `null` if Twingate has no value).
+
+**Check semantics:** all checks are **case-insensitive by default** (the rule value and the device value are both folded via `str.casefold()` before comparison). For `regex`, the pattern is compiled with `re.IGNORECASE`. To opt back into case-sensitive regex, use Python's *scoped* inline flag syntax: `(?-i:^VDI-\d+$)`. The bare form `(?-i)` is **not** valid in Python 3.12 and will be rejected at config load.
+
+**Null handling:** if the Twingate device has no value for the referenced field (`None`), every check — including `not_in` — returns `False`. A `match_mode: any` rule set against a sparse device will still fail unless at least one of its rules references a field the device actually populates.
+
+**Match-mode semantics:**
+
+- `all` — every rule must return true. Evaluation short-circuits on the first false.
+- `any` — at least one rule must return true. Evaluation short-circuits on the first true.
+
+**Example: VDI fleet matched by hostname + OS:**
+
+```yaml
+- type: manual
+  enabled: true
+  name: vdi-pool-a
+  match_mode: all
+  rules:
+    - field: hostname
+      check: starts_with
+      value: VDI-POOL-A-
+    - field: os_name
+      check: equals
+      value: Windows 10
+```
+
+**Example: executive laptops by email (any device type):**
+
+```yaml
+- type: manual
+  enabled: true
+  name: exec-laptops
+  match_mode: any
+  rules:
+    - field: user_email
+      check: in
+      value:
+        - ceo@example.com
+        - cfo@example.com
+```
+
+**Important caveat — trust-check knobs do not apply to manual matches.** The global `trust.require_online`, `trust.require_compliant`, and `trust.max_days_since_checkin` settings are evaluated against the provider-reported `is_online` / `is_compliant` / `last_seen` fields. Because the manual provider has no external source, the device it synthesises is always `is_online=True`, `is_compliant=True`, and `last_seen=now()` — so those three trust-check knobs are effectively bypassed for any device matched only by a manual rule set. If you also want those checks enforced, pair the manual provider with an MDM under `trust.mode: all`.
+
+**Composing with MDM providers:**
+
+A device trusted by both an MDM and a manual rule set in `trust.mode: any` will list both contributors in logs and notifications, e.g. `via_providers=['jumpcloud', 'vdi-pool-a']`. Under `trust.mode: all`, the device must satisfy both — the manual rule must match AND the MDM must report the device as compliant.
 
 ---
 

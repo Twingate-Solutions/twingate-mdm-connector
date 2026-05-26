@@ -2,6 +2,21 @@
 
 This guide walks through every step needed to add a new provider plugin to twingate-device-trust-bridge.
 
+## Two provider archetypes: inventory vs. evaluator
+
+Every provider falls into one of two archetypes:
+
+- **Inventory providers** (the default, used by every MDM/EDR plugin) override `list_devices()` and return a flat list of `ProviderDevice` records. The sync engine indexes that list by normalised serial number and looks up every Twingate device once per cycle.
+- **Evaluator providers** (currently just `ManualProvider`) override `evaluate_device(tg_device)` and answer "do I claim this device?" on demand, per Twingate device, without fetching any external inventory.
+
+Choose **inventory** when the source of truth is an external system that returns a list of managed devices (every MDM, every EDR, every directory). Choose **evaluator** when the decision can be made from the Twingate device record alone — e.g. ephemeral VDI fleets identified by hostname pattern, or shops with no MDM that just want hostname/email rules.
+
+A provider may implement only one archetype. Inventory providers leave `evaluate_device` at its default `None` return; evaluator providers leave `list_devices` returning an empty list.
+
+The rest of this guide describes the inventory archetype, which is the path you'll follow for any new MDM/EDR plugin.
+
+---
+
 ## Overview
 
 Each provider is a Python module in `src/providers/` that implements the `ProviderPlugin` abstract base class. The engine calls `plugin.fetch()` which in turn calls `authenticate()` then `list_devices()`. You only need to implement those two methods plus the compliance helper.

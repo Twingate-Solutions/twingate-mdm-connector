@@ -54,6 +54,7 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
         FleetDMConfig,
         JumpCloudConfig,
         ManageEngineConfig,
+        ManualConfig,
         MosyleConfig,
         NinjaOneConfig,
         RipplingConfig,
@@ -99,6 +100,10 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
             case RipplingConfig():
                 from src.providers.rippling import RipplingProvider
                 plugins.append(RipplingProvider(provider_config))
+
+            case ManualConfig():
+                from src.providers.manual import ManualProvider
+                plugins.append(ManualProvider(provider_config))
 
     return plugins
 

@@ -13,6 +13,10 @@ See ``docs/adding-a-provider.md`` for a step-by-step guide.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.twingate.models import TwingateDevice
 
 
 @dataclass
@@ -47,14 +51,19 @@ class ProviderDevice:
 class ProviderPlugin(ABC):
     """Abstract base class for MDM/EDR provider integrations.
 
-    Subclasses represent a single enabled provider instance.  The sync engine
-    calls these methods once per sync cycle:
+    Subclasses fall into one of two archetypes:
 
-    1. :meth:`authenticate` — refresh credentials if needed.
-    2. :meth:`list_devices` — fetch and return all managed devices.
+    * **Inventory providers** (every MDM/EDR plugin) override
+      :meth:`list_devices` to return a flat list of managed devices.  The
+      engine indexes the result by normalised serial number once per cycle.
+    * **Evaluator providers** (e.g. ``ManualProvider``) override
+      :meth:`evaluate_device` and are called once per untrusted Twingate
+      device, with no pre-fetched inventory.
 
-    :meth:`determine_compliance` is a helper used internally by
-    :meth:`list_devices` to compute ``is_compliant`` on each device.
+    Per cycle the engine calls :meth:`authenticate` then :meth:`list_devices`
+    on inventory providers, and :meth:`evaluate_device` on evaluator providers.
+    :meth:`determine_compliance` is a helper used internally by inventory
+    providers' :meth:`list_devices` to compute ``is_compliant`` on each device.
     """
 
     @property
@@ -122,3 +131,24 @@ class ProviderPlugin(ABC):
         """
         await self.authenticate()
         return await self.list_devices()
+
+    async def evaluate_device(
+        self, tg_device: "TwingateDevice"
+    ) -> ProviderDevice | None:
+        """Per-device evaluation hook for providers that don't pre-fetch an inventory.
+
+        Returns a synthesised :class:`ProviderDevice` if this provider claims
+        the Twingate device, or ``None`` otherwise.  The default implementation
+        returns ``None``, signalling that this provider uses the inventory
+        archetype (``list_devices`` + serial-index lookup).  Evaluator
+        providers (e.g. ``ManualProvider``) override this method.
+
+        Args:
+            tg_device: The Twingate device record to evaluate.
+
+        Returns:
+            A synthesised ``ProviderDevice`` (with ``is_compliant=True``,
+            ``is_online=True``, fresh ``last_seen``) when the device matches,
+            or ``None`` when this provider does not claim the device.
+        """
+        return None

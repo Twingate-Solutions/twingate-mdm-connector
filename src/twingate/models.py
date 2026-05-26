@@ -30,6 +30,7 @@ class TwingateDevice(BaseModel):
     os_version: str | None = Field(None, alias="osVersion")
     hostname: str | None = None
     username: str | None = None
+    device_type: str | None = Field(None, alias="deviceType")
     is_trusted: bool = Field(False, alias="isTrusted")
     active_state: str | None = Field(None, alias="activeState")
     last_connected_at: datetime | None = Field(None, alias="lastConnectedAt")

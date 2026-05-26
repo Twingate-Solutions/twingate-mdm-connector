@@ -162,6 +162,36 @@ providers:
     client_id: ${RIPPLING_CLIENT_ID}
     client_secret: ${RIPPLING_CLIENT_SECRET}
 
+  # ---------------------------------------------------------------------------
+  # Manual — evaluator-archetype provider (no external MDM/EDR API)
+  #
+  # Evaluates rules against the Twingate device record directly.  Use for
+  # ephemeral / VDI fleets identified by hostname pattern, or shops with no
+  # MDM that want simple hostname / user-email / OS rules.  Multiple manual
+  # blocks are supported — each one is an independent contributor.
+  #
+  # NOTE: the global trust.require_online / require_compliant /
+  #       max_days_since_checkin settings are effectively bypassed for any
+  #       device matched only by a manual rule set (the provider has no
+  #       external source for those signals).  See docs/configuration.md.
+  # ---------------------------------------------------------------------------
+  # - type: manual
+  #   enabled: true
+  #   name: vdi-pool-a               # required; unique across all providers
+  #   match_mode: all                # "all" (default) — every rule must match
+  #                                  # "any" — at least one rule must match
+  #   rules:
+  #     - field: hostname            # field: hostname | serial_number | os_name |
+  #       check: starts_with         #        os_version | name | username |
+  #       value: VDI-POOL-A-         #        user_email | device_type
+  #                                  # check: equals | starts_with | ends_with |
+  #                                  #        contains | regex | in | not_in
+  #     - field: device_type
+  #       check: in
+  #       value:
+  #         - LAPTOP
+  #         - DESKTOP
+
 # ---------------------------------------------------------------------------
 # Notifications (optional)
 # ---------------------------------------------------------------------------

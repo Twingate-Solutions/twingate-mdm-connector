@@ -217,3 +217,16 @@ def test_device_model_aliases() -> None:
     assert device.serial_number == "SN123"
     assert device.os_name == "macOS"
     assert device.is_trusted is False
+
+
+def test_twingate_device_parses_device_type() -> None:
+    device = TwingateDevice.model_validate({
+        "id": "dev-1",
+        "deviceType": "LAPTOP",
+    })
+    assert device.device_type == "LAPTOP"
+
+
+def test_twingate_device_device_type_optional() -> None:
+    device = TwingateDevice.model_validate({"id": "dev-1"})
+    assert device.device_type is None
