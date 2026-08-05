@@ -4,7 +4,8 @@ Auth:  API token as Bearer token — no OAuth flow required.
 API:   https://{fleet-server}/api/v1/fleet
 Docs:  https://fleetdm.com/docs/rest-api/rest-api
 
-List hosts:   GET /api/v1/fleet/hosts  (page, per_page; meta.has_next_results)
+List hosts:   GET /api/v1/fleet/hosts  (page is 0-indexed; paginate until a
+              page returns fewer than per_page rows)
 Host detail:  GET /api/v1/fleet/hosts/{id}  (includes policies array)
 
 Compliance:   All policies must have response == "pass".  An empty policy list
@@ -26,6 +27,11 @@ log = structlog.get_logger()
 _PER_PAGE = 500
 _DETAIL_CONCURRENCY = 20  # max simultaneous host-detail calls
 _MAX_PAGES = 500
+# The List hosts endpoint does not return a has_next_results flag, so we infer
+# the last page from its size.  A page returning fewer than (per_page - buffer)
+# rows is treated as the final one; the buffer errs toward one extra (possibly
+# empty) request rather than risking a silent truncation.
+_PAGE_BUFFER = 10
 
 
 class FleetDMProvider(ProviderPlugin):
@@ -75,9 +81,12 @@ class FleetDMProvider(ProviderPlugin):
         Raises:
             httpx.HTTPStatusError: On non-retryable list-endpoint errors.
         """
-        # Phase 1: collect host summaries
+        # Phase 1: collect host summaries.
+        # FleetDM pagination is 0-indexed: the first page is page 0.  Starting
+        # at page 1 skips the entire first page, which for any fleet that fits
+        # in a single page returns zero hosts (see issue #7).
         hosts: list[dict] = []
-        page = 1
+        page = 0
         auth_headers = {"Authorization": f"Bearer {self._config.api_token}"}
 
         for _page_num in range(_MAX_PAGES):
@@ -94,7 +103,9 @@ class FleetDMProvider(ProviderPlugin):
             page_hosts: list[dict] = data.get("hosts") or []
             hosts.extend(page_hosts)
 
-            if not (data.get("meta") or {}).get("has_next_results", False):
+            # A page returning fewer than per_page rows (allowing a small
+            # buffer) is the last one — see _PAGE_BUFFER.
+            if len(page_hosts) < _PER_PAGE - _PAGE_BUFFER:
                 break
             page += 1
         else:

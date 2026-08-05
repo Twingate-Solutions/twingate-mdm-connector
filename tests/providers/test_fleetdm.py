@@ -184,25 +184,63 @@ async def test_list_devices_returns_empty_when_no_hosts() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_devices_follows_has_next_results() -> None:
+async def test_list_devices_first_page_is_zero_indexed() -> None:
+    """Regression for issue #7: FleetDM pagination starts at page 0.
+
+    Starting at page 1 skips the first (and often only) page of hosts,
+    returning zero devices for any single-page fleet.
+    """
     provider = FleetDMProvider(_make_config())
 
-    host1 = _host_summary(1, "SN-1")
-    host2 = _host_summary(2, "SN-2")
-    detail1 = _detail_response(_host_detail(1, "SN-1"))
-    detail2 = _detail_response(_host_detail(2, "SN-2"))
+    list_resp = _list_response([_host_summary(1, "SN-AAA")])
+    detail_resp = _detail_response(_host_detail(1, "SN-AAA"))
 
-    # page1 has_next=True, page2 has_next=False, then 2 detail calls
-    responses = [
-        _list_response([host1], has_next=True),
-        _list_response([host2], has_next=False),
-        detail1,
-        detail2,
-    ]
+    captured_params: list[dict] = []
     call_count = 0
 
     async def _mock(*args, **kwargs):
         nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            captured_params.append(kwargs.get("params") or {})
+            return list_resp
+        return detail_resp
+
+    with patch("src.providers.fleetdm.request_with_retry", new=_mock):
+        result = await provider.list_devices()
+
+    assert captured_params[0]["page"] == 0
+    assert len(result) == 1
+
+
+@pytest.mark.asyncio
+async def test_list_devices_paginates_until_short_page(monkeypatch) -> None:
+    """A full page (per_page rows) triggers the next fetch; a short page stops.
+
+    FleetDM's List hosts endpoint has no has_next_results flag, so pagination
+    is inferred from page size. per_page/buffer are shrunk so the test needn't
+    build hundreds of host dicts.
+    """
+    monkeypatch.setattr("src.providers.fleetdm._PER_PAGE", 2)
+    monkeypatch.setattr("src.providers.fleetdm._PAGE_BUFFER", 0)
+    provider = FleetDMProvider(_make_config())
+
+    # page 0: full (2 rows) → fetch next; page 1: short (1 row) → stop.
+    responses = [
+        _list_response([_host_summary(1, "SN-1"), _host_summary(2, "SN-2")]),
+        _list_response([_host_summary(3, "SN-3")]),
+        _detail_response(_host_detail(1, "SN-1")),
+        _detail_response(_host_detail(2, "SN-2")),
+        _detail_response(_host_detail(3, "SN-3")),
+    ]
+    captured_pages: list[int] = []
+    call_count = 0
+
+    async def _mock(*args, **kwargs):
+        nonlocal call_count
+        params = kwargs.get("params")
+        if params is not None:
+            captured_pages.append(params["page"])
         resp = responses[call_count]
         call_count += 1
         return resp
@@ -210,8 +248,42 @@ async def test_list_devices_follows_has_next_results() -> None:
     with patch("src.providers.fleetdm.request_with_retry", new=_mock):
         result = await provider.list_devices()
 
+    assert captured_pages == [0, 1]
+    assert len(result) == 3
+    assert {d.serial_number for d in result} == {"SN-1", "SN-2", "SN-3"}
+
+
+@pytest.mark.asyncio
+async def test_list_devices_stops_on_exact_multiple(monkeypatch) -> None:
+    """When the total is an exact multiple of per_page, the trailing empty
+    page terminates pagination rather than truncating."""
+    monkeypatch.setattr("src.providers.fleetdm._PER_PAGE", 2)
+    monkeypatch.setattr("src.providers.fleetdm._PAGE_BUFFER", 0)
+    provider = FleetDMProvider(_make_config())
+
+    responses = [
+        _list_response([_host_summary(1, "SN-1"), _host_summary(2, "SN-2")]),
+        _list_response([]),  # exact-multiple boundary → empty final page
+        _detail_response(_host_detail(1, "SN-1")),
+        _detail_response(_host_detail(2, "SN-2")),
+    ]
+    captured_pages: list[int] = []
+    call_count = 0
+
+    async def _mock(*args, **kwargs):
+        nonlocal call_count
+        params = kwargs.get("params")
+        if params is not None:
+            captured_pages.append(params["page"])
+        resp = responses[call_count]
+        call_count += 1
+        return resp
+
+    with patch("src.providers.fleetdm.request_with_retry", new=_mock):
+        result = await provider.list_devices()
+
+    assert captured_pages == [0, 1]
     assert len(result) == 2
-    assert {d.serial_number for d in result} == {"SN-1", "SN-2"}
 
 
 # ---------------------------------------------------------------------------
