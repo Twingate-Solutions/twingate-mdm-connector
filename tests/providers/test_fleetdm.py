@@ -293,7 +293,11 @@ async def test_list_devices_stops_on_exact_multiple(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_detail_fetch_failure_falls_back_to_list_data() -> None:
-    """If the detail call fails, fall back to list data (no policies)."""
+    """If the detail call fails, fall back to list data but fail closed.
+
+    Compliance is unknown without the policy data from the detail endpoint,
+    so the device must be marked non-compliant rather than assumed compliant.
+    """
     provider = FleetDMProvider(_make_config())
 
     host = _host_summary(1, "SN-AAA")
@@ -312,10 +316,49 @@ async def test_detail_fetch_failure_falls_back_to_list_data() -> None:
     with patch("src.providers.fleetdm.request_with_retry", new=_mock):
         result = await provider.list_devices()
 
-    # Device still present (from list data), but with no policy info
+    # Device still present (from list data), but compliance unknown → False
     assert len(result) == 1
     assert result[0].serial_number == "SN-AAA"
-    assert result[0].is_compliant is True  # empty policies → compliant
+    assert result[0].is_compliant is False  # detail unavailable → fail closed
+
+
+# ---------------------------------------------------------------------------
+# _build_device — last_seen timestamp priority (issue #7)
+# ---------------------------------------------------------------------------
+
+
+def test_build_device_prefers_seen_time_for_last_seen() -> None:
+    """last_seen must come from seen_time (check-in), not last_enrolled_at.
+
+    Regression for issue #7: last_enrolled_at is a one-time enrollment date;
+    seen_time is the ongoing check-in heartbeat that max_days_since_checkin
+    is meant to measure.
+    """
+    provider = FleetDMProvider(_make_config())
+    device = provider._build_device(
+        {
+            "hardware_serial": "SN-1",
+            "last_enrolled_at": "2023-01-10T20:20:49Z",  # old, must be ignored
+            "last_restarted_at": "2024-05-01T00:00:00Z",
+            "seen_time": "2026-08-03T15:37:07Z",  # recent, must win
+        }
+    )
+    assert device.last_seen is not None
+    assert (device.last_seen.year, device.last_seen.month) == (2026, 8)
+
+
+def test_build_device_falls_back_when_seen_time_absent() -> None:
+    """With seen_time missing, last_restarted_at is preferred over enrollment."""
+    provider = FleetDMProvider(_make_config())
+    device = provider._build_device(
+        {
+            "hardware_serial": "SN-1",
+            "last_enrolled_at": "2023-01-10T20:20:49Z",
+            "last_restarted_at": "2024-05-01T00:00:00Z",
+        }
+    )
+    assert device.last_seen is not None
+    assert device.last_seen.year == 2024
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +382,23 @@ def test_compliance_no_policies_is_compliant() -> None:
     provider = FleetDMProvider(_make_config())
     assert provider.determine_compliance({}) is True
     assert provider.determine_compliance({"policies": []}) is True
+
+
+def test_compliance_unevaluated_policy_is_not_a_failure() -> None:
+    """A policy response of "" (not yet evaluated) must not fail the device."""
+    provider = FleetDMProvider(_make_config())
+    # All unevaluated → compliant (nothing has explicitly failed).
+    assert provider.determine_compliance(
+        {"policies": [{"id": 1, "response": ""}, {"id": 2, "response": ""}]}
+    ) is True
+    # Mix of pass and unevaluated → still compliant.
+    assert provider.determine_compliance(
+        {"policies": [{"id": 1, "response": "pass"}, {"id": 2, "response": ""}]}
+    ) is True
+    # An explicit fail alongside an unevaluated policy → non-compliant.
+    assert provider.determine_compliance(
+        {"policies": [{"id": 1, "response": ""}, {"id": 2, "response": "fail"}]}
+    ) is False
 
 
 # ---------------------------------------------------------------------------

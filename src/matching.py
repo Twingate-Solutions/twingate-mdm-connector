@@ -80,7 +80,7 @@ def evaluate_trust(
     mode: str,
     require_online: bool,
     require_compliant: bool,
-    max_days_since_checkin: int,
+    max_days_since_checkin: int | None,
 ) -> tuple[bool, list[str]]:
     """Decide whether a Twingate device should be trusted.
 
@@ -91,7 +91,8 @@ def evaluate_trust(
         mode: Trust mode — ``"any"`` or ``"all"``.
         require_online: If ``True``, the device must be online in the provider.
         require_compliant: If ``True``, the device must pass compliance checks.
-        max_days_since_checkin: Maximum days since last provider check-in.
+        max_days_since_checkin: Maximum days since last provider check-in, or
+            ``None`` to disable the recency check.
 
     Returns:
         A ``(should_trust, contributing_providers)`` tuple.
@@ -133,13 +134,13 @@ def _check_device(
     device: ProviderDevice,
     require_online: bool,
     require_compliant: bool,
-    max_days: int,
+    max_days: int | None,
 ) -> bool:
     """Return ``True`` if a single provider device passes all configured checks."""
     if require_online and not device.is_online:
         return False
     if require_compliant and not device.is_compliant:
         return False
-    if not is_device_recent(device, max_days):
+    if max_days is not None and not is_device_recent(device, max_days):
         return False
     return True

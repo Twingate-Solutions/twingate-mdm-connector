@@ -122,7 +122,7 @@ class FleetDMProvider(ProviderPlugin):
         # Phase 2: fetch detail (policies) for each host concurrently
         semaphore = asyncio.Semaphore(_DETAIL_CONCURRENCY)
 
-        async def _fetch_detail(host: dict) -> dict:
+        async def _fetch_detail(host: dict) -> tuple[dict, bool]:
             async with semaphore:
                 try:
                     resp = await request_with_retry(
@@ -132,23 +132,29 @@ class FleetDMProvider(ProviderPlugin):
                         headers=auth_headers,
                     )
                     resp.raise_for_status()
-                    return resp.json().get("host") or host
+                    return resp.json().get("host") or host, True
                 except Exception as exc:
                     log.warning(
-                        "Failed to fetch FleetDM host detail — using list data",
+                        "Failed to fetch FleetDM host detail — using list data, "
+                        "treating as non-compliant",
                         provider=self.name,
                         host_id=host.get("id"),
                         error=str(exc),
                     )
-                    return host  # fall back to list data (no policy info)
+                    return host, False  # detail (incl. policies) unavailable
 
-        details: list[dict] = list(
+        details: list[tuple[dict, bool]] = list(
             await asyncio.gather(*[_fetch_detail(h) for h in hosts])
         )
 
         devices: list[ProviderDevice] = []
-        for detail in details:
+        for detail, detail_ok in details:
             device = self._build_device(detail)
+            if not detail_ok:
+                # Compliance is unknown when the detail call failed (no policy
+                # data).  Fail closed so require_compliant does not trust a
+                # device on incomplete information.
+                device.is_compliant = False
             if device.serial_number:
                 devices.append(device)
             else:
@@ -165,19 +171,23 @@ class FleetDMProvider(ProviderPlugin):
     def determine_compliance(self, device: dict) -> bool:
         """Evaluate compliance from osquery policy results.
 
-        All policies must have ``response == "pass"``.  A device with no
-        configured policies is considered compliant.
+        A device is compliant when no policy has an explicit failing result.
+        A policy ``response`` of ``""`` means the policy has not been evaluated
+        yet (e.g. a freshly enrolled host) and is treated as "no verdict" rather
+        than a failure — only a non-empty, non-``"pass"`` response (typically
+        ``"fail"``) marks the device non-compliant.  A device with no configured
+        policies is considered compliant (there is nothing to fail).
 
         Args:
             device: Raw FleetDM host detail object from the API.
 
         Returns:
-            ``True`` if every policy passes (or no policies are configured).
+            ``True`` unless a policy has an explicit failing response.
         """
         policies: list[dict] = device.get("policies") or []
         if not policies:
             return True
-        return all(p.get("response") == "pass" for p in policies)
+        return all(p.get("response") in ("pass", "") for p in policies)
 
     def _build_device(self, device: dict) -> ProviderDevice:
         """Convert a raw FleetDM host dict to a :class:`ProviderDevice`.
@@ -190,8 +200,13 @@ class FleetDMProvider(ProviderPlugin):
         """
         serial_raw: str = device.get("hardware_serial") or ""
 
+        # Order matters: seen_time is Fleet's check-in heartbeat ("the last
+        # time the host contacted the fleet server"), which is what
+        # max_days_since_checkin is meant to measure.  last_enrolled_at is a
+        # one-time enrollment timestamp and last_restarted_at is a reboot time
+        # — both are poor recency signals, so they are fallbacks only (issue #7).
         last_seen: datetime | None = None
-        for ts_field in ("last_enrolled_at", "seen_time", "last_restarted_at"):
+        for ts_field in ("seen_time", "last_restarted_at", "last_enrolled_at"):
             raw_ts = device.get(ts_field)
             if raw_ts:
                 try:

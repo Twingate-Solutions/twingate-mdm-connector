@@ -60,14 +60,14 @@ Controls how compliance is evaluated and when a device is trusted.
 | `mode` | `any` \| `all` | `any` | `any`: trust if the device is compliant in at least one enabled provider. `all`: trust only if it is compliant in every enabled provider |
 | `require_online` | bool | `true` | Skip devices whose provider record indicates they are currently offline |
 | `require_compliant` | bool | `true` | Skip devices that are not marked compliant by the provider (patch status, AV health, etc.) |
-| `max_days_since_checkin` | int | `7` | Skip devices that have not checked in with their provider within this many days |
+| `max_days_since_checkin` | int \| `null` | `7` | Skip devices that have not checked in with their provider within this many days. Set to `null` to disable the recency check entirely (devices are trusted regardless of when they last checked in) |
 
 ```yaml
 trust:
   mode: any
   require_online: true
   require_compliant: true
-  max_days_since_checkin: 7
+  max_days_since_checkin: 7   # or `null` to disable the recency check
 ```
 
 **Trust mode examples:**

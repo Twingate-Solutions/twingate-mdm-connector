@@ -54,7 +54,10 @@ class TrustConfig(BaseModel):
     mode: Literal["any", "all"] = "any"
     require_online: bool = True
     require_compliant: bool = True
-    max_days_since_checkin: int = 7
+    # Maximum days since a device's last provider check-in.  Set to ``null``
+    # (None) to disable the recency check entirely — devices are then trusted
+    # regardless of how long ago they last checked in.
+    max_days_since_checkin: int | None = 7
 
 
 class LoggingConfig(BaseModel):

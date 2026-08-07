@@ -167,7 +167,7 @@ Each sync cycle follows a fetch-everything-first, compare-in-memory approach:
 - **`trust.mode: any`** — A device is trusted if it is enrolled and compliant in at least one enabled provider. Recommended for migrations or mixed environments.
 - **`trust.mode: all`** — A device must be enrolled and compliant in every enabled provider that recognises it. Use when all devices are expected to be present in all configured providers.
 - Devices matched in zero providers are never trusted.
-- Devices last seen more than `max_days_since_checkin` days ago are skipped.
+- Devices last seen more than `max_days_since_checkin` days ago are skipped (set `max_days_since_checkin: null` to disable this recency check).
 - A device that is already trusted in Twingate is never set to untrusted.
 - If a provider is unavailable or returns an error, it is skipped for that cycle — the connector never crashes on provider failure.
 
@@ -180,7 +180,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference. Key t
 | `twingate.tenant` | string | — | Your Twingate subdomain (e.g. `acme` from `acme.twingate.com`) |
 | `twingate.api_key` | string | — | Twingate API key with Devices Read + Write scopes |
 | `trust.mode` | `any` \| `all` | `any` | Trust if compliant in any vs all providers |
-| `trust.max_days_since_checkin` | int | `7` | Devices not seen in this many days are skipped |
+| `trust.max_days_since_checkin` | int \| `null` | `7` | Devices not seen in this many days are skipped; `null` disables the check |
 | `sync.interval_seconds` | int | `300` | How often to run a sync cycle |
 | `sync.dry_run` | bool | `false` | Log decisions without mutating Twingate |
 | `logging.level` | string | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |

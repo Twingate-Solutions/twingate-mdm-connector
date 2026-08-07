@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from src.config import AppConfig
-from src.matching import build_provider_index, evaluate_trust, normalize_serial
+from src.matching import build_provider_index, evaluate_trust, is_device_recent, normalize_serial
 from src.notifications.base import NullNotifier, Notifier, ProviderErrorEvent, SyncCompleteEvent, TrustEvent
 from src.providers.base import ProviderDevice, ProviderPlugin
 from src.twingate.client import TwingateClient
@@ -322,16 +322,30 @@ async def _process_device(
     if should_trust:
         return _DeviceDecision(kind="trustable", contributors=contributors)
 
+    max_days = config.trust.max_days_since_checkin
     logger.info(
         "SKIPPED: device found but did not pass trust checks",
         twingate_device_id=tg_device.id,
         device_serial=serial,
         device_name=tg_device.name,
+        # Effective trust criteria, so the failing check is diagnosable from
+        # this line alone (e.g. online/compliant True but recent False).
+        trust_criteria={
+            "require_online": config.trust.require_online,
+            "require_compliant": config.trust.require_compliant,
+            "max_days_since_checkin": max_days,
+        },
         provider_results={
             k: {
                 "found": v is not None,
                 "online": v.is_online if v else None,
                 "compliant": v.is_compliant if v else None,
+                "last_seen": v.last_seen.isoformat() if (v and v.last_seen) else None,
+                "recent": (
+                    None
+                    if (v is None or max_days is None)
+                    else is_device_recent(v, max_days)
+                ),
             }
             for k, v in provider_results.items()
         },

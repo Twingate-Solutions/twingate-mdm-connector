@@ -291,3 +291,56 @@ def test_evaluate_trust_non_compliant_skipped_when_require_compliant() -> None:
         require_online=False, require_compliant=True, max_days_since_checkin=7,
     )
     assert trust is False
+
+
+# ---------------------------------------------------------------------------
+# evaluate_trust — max_days_since_checkin=None disables the recency check
+# ---------------------------------------------------------------------------
+
+
+def test_evaluate_trust_stale_device_skipped_by_default() -> None:
+    """With a numeric cutoff, a long-idle device fails the recency check."""
+    tg = _tg_device()
+    device = ProviderDevice(
+        serial_number="ABC123",
+        is_online=True,
+        is_compliant=True,
+        last_seen=datetime.now(tz=UTC) - timedelta(days=365),
+    )
+    trust, _ = evaluate_trust(
+        tg, {"provider": device}, mode="any",
+        require_online=False, require_compliant=False, max_days_since_checkin=30,
+    )
+    assert trust is False
+
+
+def test_evaluate_trust_recency_disabled_when_max_days_none() -> None:
+    """max_days_since_checkin=None skips the recency check entirely.
+
+    A device idle for a year (and even one with no last_seen at all) is
+    trusted when the recency check is disabled.
+    """
+    tg = _tg_device()
+    stale = ProviderDevice(
+        serial_number="ABC123",
+        is_online=True,
+        is_compliant=True,
+        last_seen=datetime.now(tz=UTC) - timedelta(days=365),
+    )
+    trust, _ = evaluate_trust(
+        tg, {"provider": stale}, mode="any",
+        require_online=False, require_compliant=False, max_days_since_checkin=None,
+    )
+    assert trust is True
+
+    no_last_seen = ProviderDevice(
+        serial_number="ABC123",
+        is_online=True,
+        is_compliant=True,
+        last_seen=None,
+    )
+    trust, _ = evaluate_trust(
+        tg, {"provider": no_last_seen}, mode="any",
+        require_online=False, require_compliant=False, max_days_since_checkin=None,
+    )
+    assert trust is True

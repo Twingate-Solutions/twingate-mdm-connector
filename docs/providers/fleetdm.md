@@ -26,7 +26,7 @@ For a persistent setup with a backing database, see the [Fleet documentation](ht
 2. Fill in your work email and company details. Fleet will provision a hosted trial environment.
 3. Follow the onboarding steps to enrol at least one device before configuring this connector.
 
-> **TLS note:** If you are running Fleet self-hosted, the bridge requires a valid TLS certificate on your Fleet instance (not a self-signed cert) unless you configure a trusted CA in the Docker environment running the bridge. For local testing, running Fleet on `http://` (no TLS) and setting `base_url` to `http://localhost:8080` is acceptable.
+> **TLS note:** If you are running Fleet self-hosted, the bridge requires a valid TLS certificate on your Fleet instance (not a self-signed cert) unless you configure a trusted CA in the Docker environment running the bridge. For local testing, running Fleet on `http://` (no TLS) and setting `url` to `http://localhost:8080` is acceptable.
 
 ---
 
@@ -61,7 +61,7 @@ Add the following block to your `config.yaml`:
 providers:
   - type: fleetdm
     enabled: true
-    base_url: https://fleet.corp.example.com
+    url: https://fleet.corp.example.com
     api_token: ${FLEETDM_API_TOKEN}
 ```
 
@@ -71,7 +71,7 @@ providers:
 |-------------|----------|---------|------------------------------------------------------|
 | `type`      | Yes      | —       | Must be `fleetdm`                                    |
 | `enabled`   | Yes      | —       | Set to `true` to activate this provider              |
-| `base_url`  | Yes      | —       | Full URL of your Fleet instance (no trailing slash)  |
+| `url`       | Yes      | —       | Full URL of your Fleet instance (no trailing slash)  |
 | `api_token` | Yes      | —       | Fleet API token (use an env-var reference)           |
 
 ---
@@ -94,20 +94,21 @@ FLEETDM_API_TOKEN=your-fleet-api-token-here
 
 ## Compliance logic
 
-A device is marked **compliant** when **all** policies applied to it have `response == "pass"`. A device with no policies assigned is also considered compliant (there is nothing to fail).
+A device is marked **compliant** unless one of its policies has an explicit failing result. A device with no policies assigned is considered compliant (there is nothing to fail).
 
-Policy results are read from the per-host detail endpoint (`GET /api/v1/fleet/hosts/{id}`), which returns a `policies` array. Each entry in that array has a `response` field that can be `"pass"`, `"fail"`, or `""` (not yet evaluated). The bridge treats any response other than `"pass"` or `""` as a failure.
+Policy results are read from the per-host detail endpoint (`GET /api/v1/fleet/hosts/{id}`), which returns a `policies` array. Each entry in that array has a `response` field that can be `"pass"`, `"fail"`, or `""` (not yet evaluated). The bridge treats `""` as "no verdict yet" — a policy that has not run (e.g. on a freshly enrolled host) does **not** mark the device non-compliant. Only an explicit non-`"pass"`, non-empty response (typically `"fail"`) makes a device non-compliant.
 
 The bridge fetches host details **concurrently** (up to 20 hosts in parallel) to keep sync times low on large fleets.
 
-Fleet does **not** expose an explicit online/offline status — all enrolled devices are reported as online by this connector.
+The bridge reads each host's online/offline state from Fleet's computed `status` field: a host is treated as online only when `status == "online"`. Fleet's other statuses (`offline`, `new`, `mia`, `missing`) are treated as not-online. If you do not want offline devices skipped, set `trust.require_online: false`.
 
 ---
 
 ## Notes
 
-- **Pagination:** The bridge first pages through `GET /api/v1/fleet/hosts` using 1-indexed pages with a page size of 1000. It stops when `meta.has_next_results` is `false`. After collecting all host IDs, it concurrently fetches the detail endpoint for each host to retrieve policy results.
-- **Detail call fallback:** If the per-host detail call fails for a specific host (e.g. due to a transient error), the bridge falls back to the data available from the list endpoint. The host will have no policy information and will be treated as compliant. An error is logged so you can investigate.
+- **Pagination:** The bridge pages through `GET /api/v1/fleet/hosts` using **0-indexed** pages (the first page is `page=0`) with a page size of 500. The List hosts endpoint does not return a `has_next_results` flag, so the bridge stops when a page returns fewer rows than the page size (allowing a small buffer). After collecting all host IDs, it concurrently fetches the detail endpoint for each host to retrieve policy results.
+- **Check-in recency:** The device's last check-in time (used by `trust.max_days_since_checkin`) is read from Fleet's `seen_time` field — the last time the host contacted the Fleet server. It is **not** read from `last_enrolled_at`, which is a one-time enrollment timestamp. If `seen_time` is missing, the bridge falls back to `last_restarted_at`, then `last_enrolled_at`.
+- **Detail call fallback:** If the per-host detail call fails for a specific host (e.g. due to a transient error), the bridge falls back to the data available from the list endpoint. Because policy data is only available from the detail endpoint, the host's compliance cannot be determined and it is treated as **non-compliant** (fail closed) for that cycle. An error is logged so you can investigate.
 - **Serial numbers:** The hardware serial number is read from the `hardware_serial` field on the host object. Hosts without a serial number are silently skipped.
 - **TLS certificates:** Self-hosted Fleet instances must present a TLS certificate that the bridge's Docker container trusts. If you use a private CA, mount the CA certificate into the container and configure it as a trusted CA.
 - **Policy scope:** Fleet policies can be scoped to specific teams. The bridge reads all policies visible to the API token's user, regardless of team assignment.
