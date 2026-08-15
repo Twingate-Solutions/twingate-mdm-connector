@@ -118,7 +118,8 @@ async def test_cycle_trusts_matching_device() -> None:
 
     summary = await run_sync_cycle(config, [provider], tg_client)
 
-    tg_client.trust_device.assert_awaited_once_with("dev-1")
+    tg_client.trust_device.assert_awaited_once()
+    assert tg_client.trust_device.await_args.args[0] == "dev-1"
     assert summary.total_trusted == 1
     assert summary.total_no_match == 0
     assert summary.total_skipped == 0
@@ -207,7 +208,8 @@ async def test_one_failing_provider_does_not_block_other() -> None:
     summary = await run_sync_cycle(config, [FailingProvider(), good_provider], tg_client)
 
     # Good provider still trusted the device
-    tg_client.trust_device.assert_awaited_once_with("dev-1")
+    tg_client.trust_device.assert_awaited_once()
+    assert tg_client.trust_device.await_args.args[0] == "dev-1"
     assert summary.total_trusted == 1
 
 
@@ -258,7 +260,8 @@ async def test_trust_mode_all_both_pass() -> None:
 
     summary = await run_sync_cycle(config, [p1, p2], tg_client)
 
-    tg_client.trust_device.assert_awaited_once_with("dev-1")
+    tg_client.trust_device.assert_awaited_once()
+    assert tg_client.trust_device.await_args.args[0] == "dev-1"
     assert summary.total_trusted == 1
 
 

@@ -20,4 +20,10 @@ ENV PYTHONUNBUFFERED=1
 RUN addgroup --system app && adduser --system --ingroup app --no-create-home app
 USER app
 
+# Application version, injected by CI from the computed git tag (e.g. "1.03").
+# Defaults to "dev" for local builds that don't pass --build-arg. Placed last so
+# a version bump only rebuilds this layer, not the dependency install above.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 CMD ["python", "-m", "src.main"]

@@ -386,7 +386,7 @@ async def _trust_device(
         return
 
     try:
-        result = await tg_client.trust_device(tg_device.id)
+        result = await tg_client.trust_device(tg_device.id, contributors)
         if result.ok:
             logger.info(
                 "TRUSTED device",
