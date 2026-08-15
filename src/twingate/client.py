@@ -18,6 +18,7 @@ from src.twingate.models import (
     TwingateDevice,
     TwingateDeviceConnection,
 )
+from src.twingate.useragent import build_user_agent
 from src.utils.http import build_client, request_with_retry
 from src.utils.logging import get_logger
 
@@ -93,12 +94,29 @@ class TwingateClient:
         tenant: Twingate tenant subdomain (e.g. ``"mycompany"``).
         api_key: Admin API token generated in Twingate Settings → API.
         batch_size: Number of devices to fetch per pagination page.
+        providers: Enabled provider slugs, stamped into the ``User-Agent`` for
+            usage analytics. Defaults to empty (reported as ``providers=none``).
+        trust_mode: Trust evaluation mode (``"any"``/``"all"``) for the
+            ``User-Agent``.
+        dry_run: Whether the connector is in dry-run mode, for the ``User-Agent``.
     """
 
-    def __init__(self, tenant: str, api_key: str, batch_size: int = 50) -> None:
+    def __init__(
+        self,
+        tenant: str,
+        api_key: str,
+        batch_size: int = 50,
+        *,
+        providers: list[str] | None = None,
+        trust_mode: str = "any",
+        dry_run: bool = False,
+    ) -> None:
         self._tenant = tenant
         self._api_key = api_key
         self._batch_size = batch_size
+        self._providers = providers or []
+        self._trust_mode = trust_mode
+        self._dry_run = dry_run
         self._endpoint = f"https://{tenant}.twingate.com/api/graphql/"
         self._client: httpx.AsyncClient | None = None
 
@@ -149,6 +167,7 @@ class TwingateClient:
                 _QUERY_UNTRUSTED_DEVICES,
                 variables,
                 operation="GetUntrustedDevices",
+                op="list",
             )
 
             connection = TwingateDeviceConnection.model_validate(
@@ -174,11 +193,15 @@ class TwingateClient:
         )
         return devices
 
-    async def trust_device(self, device_id: str) -> TrustMutationResult:
+    async def trust_device(
+        self, device_id: str, contributors: list[str] | None = None
+    ) -> TrustMutationResult:
         """Mark a single device as trusted via the ``deviceUpdate`` mutation.
 
         Args:
             device_id: The Twingate device ``id`` (GraphQL ``ID`` scalar).
+            contributors: Provider slug(s) that voted to trust this device;
+                stamped into the ``User-Agent`` as ``via=`` for analytics.
 
         Returns:
             A :class:`~src.twingate.models.TrustMutationResult` with ``ok``,
@@ -191,6 +214,8 @@ class TwingateClient:
             _MUTATION_TRUST_DEVICE,
             {"id": device_id},
             operation="TrustDevice",
+            op="trust",
+            via=contributors,
         )
         result = TrustMutationResult.model_validate(data["deviceUpdate"])
 
@@ -218,8 +243,16 @@ class TwingateClient:
         query: str,
         variables: dict[str, Any],
         operation: str,
+        *,
+        op: str,
+        via: list[str] | None = None,
     ) -> dict[str, Any]:
         """Send a single GraphQL request and return the ``data`` dict.
+
+        Args:
+            op: Analytics operation label for the ``User-Agent`` (``"list"``/
+                ``"trust"``).
+            via: Contributing provider slug(s) for trust mutations.
 
         Raises:
             ValueError: If the response contains GraphQL ``errors``.
@@ -231,12 +264,20 @@ class TwingateClient:
             )
 
         payload = {"query": query, "variables": variables, "operationName": operation}
+        user_agent = build_user_agent(
+            providers=self._providers,
+            mode=self._trust_mode,
+            dry_run=self._dry_run,
+            op=op,
+            via=via,
+        )
 
         response = await request_with_retry(
             self._client,
             "POST",
             self._endpoint,
             json=payload,
+            headers={"User-Agent": user_agent},
         )
         response.raise_for_status()
 

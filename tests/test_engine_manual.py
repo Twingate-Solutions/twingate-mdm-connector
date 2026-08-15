@@ -80,7 +80,8 @@ async def test_manual_alone_trusts_matching_device() -> None:
     summary = await run_sync_cycle(config, [provider], tg)
 
     assert summary.total_trusted == 1
-    tg.trust_device.assert_awaited_once_with("d1")
+    tg.trust_device.assert_awaited_once()
+    assert tg.trust_device.await_args.args[0] == "d1"
 
 
 @pytest.mark.asyncio
@@ -181,7 +182,8 @@ async def test_no_serial_device_matched_by_manual_is_trusted() -> None:
     summary = await run_sync_cycle(config, [manual], tg)
 
     assert summary.total_trusted == 1
-    tg.trust_device.assert_awaited_once_with("d1")
+    tg.trust_device.assert_awaited_once()
+    assert tg.trust_device.await_args.args[0] == "d1"
 
 
 @pytest.mark.asyncio
@@ -319,7 +321,7 @@ async def test_mutation_fanout_capped_by_batch_size() -> None:
     max_in_flight = 0
     lock = asyncio.Lock()
 
-    async def fake_trust(device_id: str) -> TrustMutationResult:
+    async def fake_trust(device_id: str, contributors=None) -> TrustMutationResult:
         nonlocal in_flight, max_in_flight
         async with lock:
             in_flight += 1
@@ -350,7 +352,7 @@ async def test_one_mutation_failure_does_not_abort_batch() -> None:
         ManualRuleConfig(field="hostname", check="starts_with", value="VDI-"),
     ])
 
-    async def trust_with_one_failure(device_id: str) -> TrustMutationResult:
+    async def trust_with_one_failure(device_id: str, contributors=None) -> TrustMutationResult:
         if device_id == "d2":
             raise RuntimeError("boom")
         return TrustMutationResult(ok=True)

@@ -64,6 +64,9 @@ async def run_scheduler(
                     tenant=config.twingate.tenant,
                     api_key=config.twingate.api_key,
                     batch_size=config.sync.batch_size,
+                    providers=sorted({p.type for p in config.enabled_providers}),
+                    trust_mode=config.trust.mode,
+                    dry_run=config.sync.dry_run,
                 ) as tg_client:
                     await run_sync_cycle(
                         config=config,
