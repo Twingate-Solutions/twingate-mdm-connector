@@ -190,7 +190,9 @@ docs/superpowers/
 docs/sessions
 docs/API_LIMITS_AND_UNTRUST.md
 docs/POSTURE_AND_UNTRUST_EXPLORATION.md
+docs/crowdstrike-eval.md
 
 
 # Local config (contains credentials — use config.yaml.example as template)
 config.yaml
+MULTIVERSE_AUDIT.md
