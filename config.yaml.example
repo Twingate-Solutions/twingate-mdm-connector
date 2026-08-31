@@ -77,6 +77,26 @@ providers:
     client_secret: ${SOPHOS_CLIENT_SECRET}
 
   # ---------------------------------------------------------------------------
+  # CrowdStrike Falcon
+  # Auth: OAuth2 Client Credentials (API client with the "Hosts: Read" scope)
+  # Clouds: us-1 | us-2 | us-3 | eu-1 | us-gov-1 | us-gov-2
+  # ---------------------------------------------------------------------------
+  - type: crowdstrike
+    enabled: false
+    cloud: us-1                    # Falcon cloud your API client belongs to
+    client_id: ${CROWDSTRIKE_CLIENT_ID}
+    client_secret: ${CROWDSTRIKE_CLIENT_SECRET}
+
+    # Compliance checks (all optional — omitting this block uses the defaults shown)
+    compliance:
+      require_not_contained: true  # reject network-contained (isolated) hosts
+      require_full_sensor: true    # reject hosts in Reduced Functionality Mode
+      require_live: false          # set true to require a currently-connected
+                                   # sensor (extra online-state API call; with
+                                   # trust.require_online this rejects any
+                                   # powered-off host)
+
+  # ---------------------------------------------------------------------------
   # ManageEngine Endpoint Central — on-prem variant
   # Auth: API token
   # ---------------------------------------------------------------------------

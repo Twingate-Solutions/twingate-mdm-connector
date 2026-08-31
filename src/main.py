@@ -50,6 +50,7 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
     """
     from src.config import (
         AutomoxConfig,
+        CrowdStrikeConfig,
         DattoConfig,
         FleetDMConfig,
         JumpCloudConfig,
@@ -72,6 +73,10 @@ def _build_providers(config: AppConfig) -> list[ProviderPlugin]:
             case SophosConfig():
                 from src.providers.sophos import SophosProvider
                 plugins.append(SophosProvider(provider_config))
+
+            case CrowdStrikeConfig():
+                from src.providers.crowdstrike import CrowdStrikeProvider
+                plugins.append(CrowdStrikeProvider(provider_config))
 
             case ManageEngineConfig():
                 from src.providers.manageengine import ManageEngineProvider

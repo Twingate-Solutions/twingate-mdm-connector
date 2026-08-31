@@ -61,6 +61,16 @@ Install the agent for each provider you want to test. You only need to install t
 3. Run the installer on the VM.
 4. The device appears under **Computers** within ~5 minutes.
 
+### CrowdStrike Falcon
+
+1. In the Falcon console, go to **Host setup and management > Deploy > Sensor downloads**.
+2. Copy your **Customer ID (CID)** from that page (including its checksum suffix) and download the **Windows sensor** installer.
+3. Run the installer on the VM with the CID, e.g. from an elevated prompt:
+   ```
+   WindowsSensor.exe /install /quiet /norestart CID=<your-CID-with-checksum>
+   ```
+4. The host appears under **Host setup and management > Host management** within ~5 minutes.
+
 ### ManageEngine Endpoint Central
 
 **Cloud:** Use the Agent Deploy wizard in the ManageEngine console.
@@ -115,6 +125,7 @@ After the agent checks in, find the device in the provider console and confirm i
 |---|---|
 | NinjaOne | Devices > click device > **System** tab > Serial Number |
 | Sophos | Computers > click device > **Summary** > Serial number |
+| CrowdStrike | Host management > click host > host details panel > **Serial number** |
 | ManageEngine | Inventory > Computers > click device > **Hardware** > BIOS Serial |
 | Automox | Devices > click device > **Details** > Serial Number |
 | JumpCloud | Devices > Systems > click device > **Details** > Serial Number |

@@ -161,6 +161,39 @@ The bridge automatically discovers the tenant's regional API base URL via the So
 
 ---
 
+### `crowdstrike`
+
+| Key | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `type` | `"crowdstrike"` | Yes | — | Provider type identifier |
+| `enabled` | bool | No | `false` | Enable this provider |
+| `cloud` | enum | No | `us-1` | Falcon cloud: `us-1`, `us-2`, `us-3`, `eu-1`, `us-gov-1`, `us-gov-2` |
+| `client_id` | string | Yes | — | Falcon API client ID |
+| `client_secret` | string | Yes | — | Falcon API client secret |
+| `compliance.require_not_contained` | bool | No | `true` | Reject hosts whose `status` is `contained` or `containment_pending` |
+| `compliance.require_full_sensor` | bool | No | `true` | Reject hosts with `reduced_functionality_mode: yes` |
+| `compliance.require_live` | bool | No | `false` | Drive `is_online` from a live online-state lookup instead of "the sensor has checked in" |
+
+The API client needs the **Hosts: Read** scope. `cloud` is a closed set — an unrecognised value is a startup error, not a request to a nonexistent host.
+
+Both compliance checks fail **open** on an absent field: `reduced_functionality_mode` is commonly missing on macOS and Linux hosts, and a host that does not report a signal is not treated as failing it.
+
+By default `is_online` means "this sensor has checked in at least once", so a powered-off but healthy laptop is still eligible for trust (recency is handled centrally by `trust.max_days_since_checkin`). Setting `compliance.require_live: true` adds a call to `/devices/entities/online-state/v1` per 100 hosts and requires `state == "online"` — combined with the default `trust.require_online: true` that restricts trust to hosts powered on and connected at sync time.
+
+```yaml
+- type: crowdstrike
+  enabled: true
+  cloud: us-1
+  client_id: ${CROWDSTRIKE_CLIENT_ID}
+  client_secret: ${CROWDSTRIKE_CLIENT_SECRET}
+  compliance:
+    require_not_contained: true
+    require_full_sensor: true
+    require_live: false
+```
+
+---
+
 ### `manageengine`
 
 Supports two authentication variants: `onprem` (API token) and `cloud` (Zoho OAuth2).
