@@ -196,3 +196,9 @@ docs/crowdstrike-eval.md
 # Local config (contains credentials — use config.yaml.example as template)
 config.yaml
 MULTIVERSE_AUDIT.md
+
+# OS generated files
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
