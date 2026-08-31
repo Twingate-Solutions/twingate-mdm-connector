@@ -178,6 +178,50 @@ class SophosConfig(BaseModel):
     client_secret: str
 
 
+class CrowdStrikeComplianceConfig(BaseModel):
+    """Compliance / liveness check settings for the CrowdStrike Falcon provider.
+
+    Every enabled check must pass for a host to be considered compliant.  All
+    checks fail **open** on an absent field — a host that does not report a
+    signal is not treated as failing it (``reduced_functionality_mode`` is
+    commonly missing on macOS and Linux hosts).
+
+    Attributes:
+        require_not_contained: Reject hosts whose ``status`` is ``contained``
+            or ``containment_pending`` — i.e. an analyst has network-isolated
+            the host.  Enabled by default.
+        require_full_sensor: Reject hosts running in Reduced Functionality Mode
+            (``reduced_functionality_mode == "yes"``).  Enabled by default.
+        require_live: Drive ``is_online`` from a live
+            ``/devices/entities/online-state/v1`` lookup instead of "the sensor
+            has checked in at least once".  Disabled by default — with
+            ``trust.require_online: true`` (the default) enabling this restricts
+            trust to hosts that are powered on and connected at sync time.
+    """
+
+    require_not_contained: bool = True
+    require_full_sensor: bool = True
+    require_live: bool = False
+
+
+class CrowdStrikeConfig(BaseModel):
+    """CrowdStrike Falcon provider configuration.
+
+    ``cloud`` selects the Falcon cloud the API credential belongs to; it is a
+    closed set so a typo is a startup error rather than a silent request to a
+    nonexistent host.
+    """
+
+    type: Literal["crowdstrike"]
+    enabled: bool = False
+    cloud: Literal["us-1", "us-2", "us-3", "eu-1", "us-gov-1", "us-gov-2"] = "us-1"
+    client_id: str
+    client_secret: str
+
+    # compliance checks (omitting this block uses the defaults)
+    compliance: CrowdStrikeComplianceConfig = CrowdStrikeComplianceConfig()
+
+
 class ManageEngineCloudComplianceConfig(BaseModel):
     """Compliance check settings for the ManageEngine cloud variant.
 
@@ -358,6 +402,7 @@ class ManualConfig(BaseModel):
 ProviderConfig = Annotated[
     NinjaOneConfig
     | SophosConfig
+    | CrowdStrikeConfig
     | ManageEngineConfig
     | AutomoxConfig
     | JumpCloudConfig

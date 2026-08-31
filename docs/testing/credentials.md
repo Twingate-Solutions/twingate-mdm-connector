@@ -1,6 +1,6 @@
 # Provider Credentials for Testing
 
-This document covers how to obtain test credentials for each of the 8 supported providers. For each provider, you need credentials with read access to the device inventory. The bridge never writes to provider APIs.
+This document covers how to obtain test credentials for the supported providers. For each provider, you need credentials with read access to the device inventory. The bridge never writes to provider APIs.
 
 ## Quick reference
 
@@ -8,6 +8,7 @@ This document covers how to obtain test credentials for each of the 8 supported 
 |---|---|---|---|
 | NinjaOne | 30-day free trial | https://www.ninjaone.com/free-trial/ | OAuth2 client credentials |
 | Sophos Central | 30-day free trial | https://www.sophos.com/en-us/free-trials/sophos-central | OAuth2 client credentials |
+| CrowdStrike Falcon | 15-day free trial (Falcon Go) | https://www.crowdstrike.com/en-us/products/trials/try-falcon-prevent/ | OAuth2 client credentials |
 | ManageEngine Endpoint Central | Cloud trial / on-prem free (≤25 devices) | https://www.manageengine.com/products/desktop-central/free-trial.html | Cloud: Zoho OAuth2 / On-prem: API token |
 | Automox | Free trial | https://www.automox.com/free-trial | API key (Bearer) |
 | JumpCloud | **Free tier (up to 10 devices, no expiry)** | https://www.jumpcloud.com/signup | API key header |
@@ -89,6 +90,48 @@ Skip **Datto RMM** (requires contacting sales) and **Mosyle** (Apple-only — sk
   client_id: ${SOPHOS_CLIENT_ID}
   client_secret: ${SOPHOS_CLIENT_SECRET}
 ```
+
+---
+
+## CrowdStrike Falcon
+
+**Account type:** 15-day free trial (Falcon Go bundle)
+**Sign-up:** https://www.crowdstrike.com/en-us/products/trials/try-falcon-prevent/
+
+**Minimum required permissions:** Hosts — **Read** (no write scope on any resource)
+
+**Generating credentials:**
+
+1. Log into the Falcon console as an administrator (creating API clients requires the **Falcon Administrator** role).
+2. Go to **Support and resources > Resources and tools > API clients and keys**.
+3. Under **OAuth2 API clients**, click **Create API client**.
+4. Give it a name (e.g. `twingate-mdm-connector`), tick **Read** next to the **Hosts** scope, and leave everything else unticked.
+5. Save — you'll receive a **Client ID**, **Client Secret**, and **Base URL**. The secret is shown only once.
+
+**Gotcha:** The **Base URL** on that screen identifies your Falcon cloud, and you must set `cloud` to match it. Unlike Sophos, there is no discovery endpoint — a credential from the `us-2` cloud authenticating against `us-1` returns a 403, not a redirect.
+
+| Base URL | `cloud` value |
+|---|---|
+| `https://api.crowdstrike.com` | `us-1` |
+| `https://api.us-2.crowdstrike.com` | `us-2` |
+| `https://api.us-3.crowdstrike.com` | `us-3` |
+| `https://api.eu-1.crowdstrike.com` | `eu-1` |
+| `https://api.laggar.gcw.crowdstrike.com` | `us-gov-1` |
+| `https://api.us-gov-2.crowdstrike.mil` | `us-gov-2` |
+
+**Gotcha:** With the default `compliance.require_live: false`, a host that has ever checked in counts as online, so a powered-off test VM still passes `trust.require_online`. Set `require_live: true` only if you want to test the stricter "sensor connected right now" path — and keep the VM running while the sync cycle fires.
+
+**Config fields:**
+
+```yaml
+- type: crowdstrike
+  enabled: true
+  cloud: us-1
+  client_id: ${CROWDSTRIKE_CLIENT_ID}
+  client_secret: ${CROWDSTRIKE_CLIENT_SECRET}
+```
+
+See [docs/providers/crowdstrike.md](../providers/crowdstrike.md) for the full compliance options.
 
 ---
 

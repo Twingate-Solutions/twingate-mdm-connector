@@ -21,6 +21,7 @@ MDM/EDR providers          twingate-mdm-connector                Twingate
 ──────────────────         ──────────────────────────────         ─────────
 NinjaOne  ─────────┐
 Sophos    ─────────┤
+CrowdStrike  ──────┤
 ManageEngine  ─────┤
 Automox   ─────────┤──►  serial number match + compliance  ──►  isTrusted: true
 JumpCloud ─────────┤       (never sets isTrusted: false)
@@ -42,6 +43,7 @@ Support for providers and third-party integrations is being added and validated 
 | ManageEngine Endpoint Central (cloud) | MDM / RMM | ✅ |
 | ManageEngine Endpoint Central (on-prem) | MDM / RMM | |
 | Sophos Central | EDR | |
+| CrowdStrike Falcon | EDR | |
 | Automox | RMM | |
 | JumpCloud | MDM / IAM | ✅ |
 | FleetDM | MDM | |
@@ -133,6 +135,7 @@ services:
 | -------- | ---- | ---- |
 | NinjaOne | OAuth2 client credentials | [docs/providers/ninjaone.md](docs/providers/ninjaone.md) |
 | Sophos | OAuth2 client credentials + tenant discovery | [docs/providers/sophos.md](docs/providers/sophos.md) |
+| CrowdStrike Falcon | OAuth2 client credentials | [docs/providers/crowdstrike.md](docs/providers/crowdstrike.md) |
 | ManageEngine (cloud) | Zoho OAuth2 | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
 | ManageEngine (on-prem) | API token | [docs/providers/manageengine.md](docs/providers/manageengine.md) |
 | Automox | API key | [docs/providers/automox.md](docs/providers/automox.md) |
