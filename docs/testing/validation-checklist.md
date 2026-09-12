@@ -17,7 +17,7 @@ Each step is labelled:
   > Verify by: credentials are shown in the console and copied to a secure location.
 
 - [ ] **[You do this]** Sign up for a Twingate account and identify the tenant name (see [twingate-setup.md](twingate-setup.md)).
-  > Verify by: you can access the Twingate Admin Console at `https://{tenant}.twingate.com`.
+  > Verify by: you can access the Twingate Admin Console at its URL — `https://<tenant>.twingate.com` (legacy) or `https://<tenant>.<shard>.twingate.com` (shard-based, e.g. `us1`).
 
 - [ ] **[You do this]** Generate a Twingate API key with **Devices: Read** and **Devices: Write** scopes (Admin Console > Settings > API > Create API Key).
   > Verify by: the key is shown — copy it immediately, it is displayed only once.

@@ -37,7 +37,7 @@ Create `config.yaml` in the project root:
 
 ```yaml
 twingate:
-  tenant: your-tenant-name   # e.g. "acme" from acme.twingate.com
+  tenant: your-tenant-name   # part before .twingate.com: "acme" (legacy) or "acme.us1" (shard)
   api_key: ${TWINGATE_API_KEY}
 
 sync:

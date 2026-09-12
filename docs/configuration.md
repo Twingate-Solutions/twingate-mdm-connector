@@ -21,7 +21,7 @@ Connection settings for the Twingate GraphQL API.
 
 | Key | Type | Required | Description |
 |---|---|---|---|
-| `tenant` | string | Yes | Twingate tenant name — the subdomain from your Admin Console URL. E.g. `acme` from `acme.twingate.com` |
+| `tenant` | string | Yes | Twingate tenant name — the part of your Admin Console URL before `.twingate.com`. Copy it from the console: `acme` from `acme.twingate.com` (legacy) or `acme.us1` from `acme.us1.twingate.com` (shard-based, e.g. `us1`) |
 | `api_key` | string | Yes | Twingate API key with Devices Read + Write scopes. Generate in Admin Console > Settings > API |
 
 ```yaml

@@ -127,7 +127,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--tenant",
         default=os.environ.get("TWINGATE_TENANT"),
-        help="Twingate tenant name (e.g. 'mycompany' from mycompany.twingate.com). "
+        help="Twingate tenant name — the part of your Admin Console URL before "
+             ".twingate.com: 'mycompany' (legacy) or 'mycompany.us1' (shard-based). "
              "Can also be set via TWINGATE_TENANT env var.",
     )
     parser.add_argument(

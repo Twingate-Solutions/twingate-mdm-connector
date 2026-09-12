@@ -12,7 +12,7 @@
 # Twingate connection
 # -----------------------------------------------------------------------------
 twingate:
-  tenant: ${TWINGATE_TENANT}       # e.g. "mycompany" → mycompany.twingate.com
+  tenant: ${TWINGATE_TENANT}       # part before .twingate.com: mycompany (legacy) or mycompany.us1 (shard)
   api_key: ${TWINGATE_API_KEY}
 
 # -----------------------------------------------------------------------------

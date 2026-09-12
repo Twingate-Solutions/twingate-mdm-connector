@@ -69,12 +69,12 @@ Support for providers and third-party integrations is being added and validated 
 
 ### 1. Create a config file
 
-The only required top-level keys to get started are `twingate` and `providers`. `tenant` is the subdomain of your Twingate Admin Console URL — for `acme.twingate.com` the tenant is `acme`.
+The only required top-level keys to get started are `twingate` and `providers`. `tenant` is the part of your Twingate Admin Console URL before `.twingate.com` — copy it from the console rather than assuming a single label: `acme` for `acme.twingate.com` (legacy) or `acme.us1` for `acme.us1.twingate.com` (shard-based, where `us1` is your shard).
 
 ```yaml
 # config.yaml
 twingate:
-  tenant: acme                      # your subdomain from acme.twingate.com
+  tenant: acme                      # part before .twingate.com: acme (legacy) or acme.us1 (shard)
   api_key: ${TWINGATE_API_KEY}
 
 trust:
@@ -179,7 +179,7 @@ See [docs/configuration.md](docs/configuration.md) for the full reference. Key t
 
 | Key | Type | Default | Description |
 | --- | ---- | ------- | ----------- |
-| `twingate.tenant` | string | — | Your Twingate subdomain (e.g. `acme` from `acme.twingate.com`) |
+| `twingate.tenant` | string | — | Part of your Admin Console URL before `.twingate.com` — `acme` (legacy) or `acme.us1` (shard-based, e.g. `us1`). Copy it from the console. |
 | `twingate.api_key` | string | — | Twingate API key with Devices Read + Write scopes |
 | `trust.mode` | `any` \| `all` | `any` | Trust if compliant in any vs all providers |
 | `trust.max_days_since_checkin` | int \| `null` | `7` | Devices not seen in this many days are skipped; `null` disables the check |

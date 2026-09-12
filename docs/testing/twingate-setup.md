@@ -5,7 +5,7 @@ This document covers creating a Twingate test network, generating an API key wit
 ## Step 1: Create a Twingate account
 
 1. Sign up at https://www.twingate.com/ — the free starter plan supports up to 5 users.
-2. After signup, a **Network** is created automatically. Note the **tenant name** — it appears in the Admin Console URL as `https://{tenant}.twingate.com`. For example, if your Admin Console is `https://acme.twingate.com`, your tenant is `acme`.
+2. After signup, a **Network** is created automatically. Note the **tenant name** — it is the part of the Admin Console URL before `.twingate.com`. Copy it from the console rather than assuming a single label: if your Admin Console is `https://acme.twingate.com` the tenant is `acme` (legacy); if it is `https://acme.us1.twingate.com` the tenant is `acme.us1` (shard-based, where `us1` is your shard).
 3. For testing, you can use the default network or create a dedicated test network.
 
 ## Step 2: Create a test resource
@@ -32,14 +32,14 @@ The bridge needs an API key with **Devices read** and **Devices write** permissi
 4. Save. **Copy the API key immediately** — it is shown only once.
 
 Note your:
-- **Tenant name** (e.g. `acme`)
+- **Tenant name** (e.g. `acme`, or `acme.us1` on a shard-based tenant — the part before `.twingate.com`)
 - **API key** (the long token you just copied)
 
 These go into the bridge config:
 
 ```yaml
 twingate:
-  tenant: acme
+  tenant: acme            # or acme.us1 on a shard-based tenant (part before .twingate.com)
   api_key: ${TWINGATE_API_KEY}
 ```
 
@@ -159,6 +159,8 @@ Go to **Admin Console > Devices** — the device should show **Trust Status: Tru
 ### Via GraphQL API
 
 ```bash
+# Replace {tenant} with the part of your Admin Console URL before .twingate.com
+# (acme → acme.twingate.com, or acme.us1 → acme.us1.twingate.com on a shard-based tenant)
 curl -s -X POST \
   "https://{tenant}.twingate.com/api/graphql/" \
   -H "X-API-KEY: {api_key}" \
