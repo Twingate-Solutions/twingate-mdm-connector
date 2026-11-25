@@ -152,7 +152,7 @@ Each sync cycle follows a fetch-everything-first, compare-in-memory approach:
 
 1. **Provider fetch (parallel)** — every enabled provider is queried concurrently. Each provider exhausts all pages of its device API before returning, so the connector holds a complete snapshot of that provider's inventory. For large fleets this may involve several paginated API calls per provider, but all providers run at the same time so the total wall-clock time is bounded by the slowest single provider.
 
-2. **Index build** — each provider's device list is indexed into a `serial_number → device` dictionary for O(1) lookup. Serial numbers are normalised (`strip().upper()`) at index time.
+2. **Index build** — each provider's device list is indexed into a `serial_number → device` dictionary for O(1) lookup. Serial numbers are normalised (`strip().upper()`) at index time. If a provider returns several records with the same serial (common after a reimage, rename, or agent reinstall), the most recently seen record wins.
 
 3. **Twingate fetch** — after all provider indexes are ready, the connector fetches all untrusted active devices from Twingate (also fully paginated).
 
