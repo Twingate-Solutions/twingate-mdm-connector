@@ -121,11 +121,15 @@ async def run_sync_cycle(
         try:
             devices = await plugin.fetch()
             stats.devices_fetched = len(devices)
-            provider_indices[plugin.name] = build_provider_index(devices)
+            index = build_provider_index(devices)
+            provider_indices[plugin.name] = index
             logger.info(
                 "Provider fetch complete",
                 provider=plugin.name,
                 devices_fetched=stats.devices_fetched,
+                # Lower than devices_fetched when several records share a
+                # serial; only the most recently seen one is indexed.
+                devices_indexed=len(index),
             )
         except Exception as exc:
             stats.available = False
@@ -338,6 +342,9 @@ async def _process_device(
         provider_results={
             k: {
                 "found": v is not None,
+                # Identifies which provider record was matched, so a stale or
+                # duplicate record is diagnosable from this line alone.
+                "hostname": v.hostname if v else None,
                 "online": v.is_online if v else None,
                 "compliant": v.is_compliant if v else None,
                 "last_seen": v.last_seen.isoformat() if (v and v.last_seen) else None,

@@ -126,6 +126,40 @@ async def test_cycle_trusts_matching_device() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cycle_uses_most_recent_record_for_duplicate_serial() -> None:
+    """Regression: a stale record listed first must not block trust.
+
+    After a reimage the provider keeps the old host record (same serial, last
+    seen weeks ago) alongside the current one.  The stale record must not be
+    the one evaluated.
+    """
+    config = _make_config(max_days=7)
+    tg_device = _make_tg_device("dev-1", "SN-REIMAGED")
+    stale = ProviderDevice(
+        serial_number="SN-REIMAGED",
+        hostname="DESKTOP-OLDIMAGE",
+        is_online=True,
+        is_compliant=True,
+        last_seen=datetime.now(tz=UTC) - timedelta(days=30),
+    )
+    current = ProviderDevice(
+        serial_number="SN-REIMAGED",
+        hostname="LAPTOP-CURRENT",
+        is_online=True,
+        is_compliant=True,
+        last_seen=datetime.now(tz=UTC) - timedelta(hours=1),
+    )
+    provider = MockProvider("crowdstrike", [stale, current])
+    tg_client = _make_tg_client([tg_device])
+
+    summary = await run_sync_cycle(config, [provider], tg_client)
+
+    tg_client.trust_device.assert_awaited_once()
+    assert summary.total_trusted == 1
+    assert summary.total_skipped == 0
+
+
+@pytest.mark.asyncio
 async def test_cycle_dry_run_does_not_call_trust_mutation() -> None:
     config = _make_config(dry_run=True)
     tg_device = _make_tg_device("dev-1", "SN123")

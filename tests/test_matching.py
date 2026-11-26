@@ -77,11 +77,52 @@ def test_build_provider_index_skips_empty_serial() -> None:
     assert "VALID" in index
 
 
-def test_build_provider_index_first_wins_on_duplicate() -> None:
+def test_build_provider_index_most_recent_wins_when_listed_second() -> None:
+    """A reimaged machine: the stale record comes back first from the API."""
+    stale = _make_device(
+        "SN-REIMAGED", hostname="DESKTOP-OLDIMAGE", last_seen=datetime(2026, 9, 24, tzinfo=UTC)
+    )
+    current = _make_device(
+        "sn-reimaged", hostname="LAPTOP-CURRENT", last_seen=datetime(2026, 10, 1, tzinfo=UTC)
+    )
+    index = build_provider_index([stale, current])
+    assert index["SN-REIMAGED"].hostname == "LAPTOP-CURRENT"
+
+
+def test_build_provider_index_most_recent_wins_when_listed_first() -> None:
+    current = _make_device("ABC", hostname="current", last_seen=datetime(2026, 10, 1, tzinfo=UTC))
+    stale = _make_device("ABC", hostname="stale", last_seen=datetime(2026, 8, 21, tzinfo=UTC))
+    index = build_provider_index([current, stale])
+    assert index["ABC"].hostname == "current"
+
+
+def test_build_provider_index_seen_record_beats_never_seen() -> None:
+    never = _make_device("ABC", hostname="never-seen", last_seen=None)
+    seen = _make_device("ABC", hostname="seen", last_seen=datetime(2020, 1, 1, tzinfo=UTC))
+    assert build_provider_index([never, seen])["ABC"].hostname == "seen"
+    assert build_provider_index([seen, never])["ABC"].hostname == "seen"
+
+
+def test_build_provider_index_first_wins_on_tie() -> None:
     d1 = _make_device("ABC", hostname="first")
     d2 = _make_device("abc", hostname="second")
     index = build_provider_index([d1, d2])
     assert index["ABC"].hostname == "first"
+
+    ts = datetime(2026, 10, 1, tzinfo=UTC)
+    d3 = _make_device("XYZ", hostname="first", last_seen=ts)
+    d4 = _make_device("XYZ", hostname="second", last_seen=ts)
+    assert build_provider_index([d3, d4])["XYZ"].hostname == "first"
+
+
+def test_build_provider_index_mixed_naive_and_aware_timestamps() -> None:
+    """Naive timestamps are treated as UTC — comparing must not raise."""
+    naive_newer = _make_device("ABC", hostname="naive", last_seen=datetime(2026, 10, 1, 12, 0))
+    aware_older = _make_device(
+        "ABC", hostname="aware", last_seen=datetime(2026, 10, 1, 11, 0, tzinfo=UTC)
+    )
+    assert build_provider_index([aware_older, naive_newer])["ABC"].hostname == "naive"
+    assert build_provider_index([naive_newer, aware_older])["ABC"].hostname == "naive"
 
 
 def test_build_provider_index_empty_list() -> None:

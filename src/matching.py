@@ -36,8 +36,16 @@ def build_provider_index(
     """Build a lookup dict keyed by normalized serial number.
 
     Devices whose ``serial_number`` normalizes to ``None`` are silently
-    excluded (they cannot be matched).  If duplicate serials appear only the
-    first occurrence is kept.
+    excluded (they cannot be matched).
+
+    When several records share a serial, the one with the most recent
+    ``last_seen`` wins.  Providers routinely keep a stale record after a
+    machine is reimaged, renamed, or has its agent reinstalled — the old record
+    lingers alongside the new one under the same serial.  The most recent
+    record reflects the device's current state; an older record must never be
+    allowed to vote for (or against) it.  A record with no ``last_seen`` loses
+    to any record that has one, and on an exact tie the first occurrence is
+    kept.
 
     Args:
         devices: List of :class:`~src.providers.base.ProviderDevice` objects
@@ -49,9 +57,32 @@ def build_provider_index(
     index: dict[str, ProviderDevice] = {}
     for device in devices:
         key = normalize_serial(device.serial_number)
-        if key and key not in index:
+        if not key:
+            continue
+        current = index.get(key)
+        if current is None or _last_seen_sort_key(device) > _last_seen_sort_key(current):
             index[key] = device
     return index
+
+
+# Sorts below every real timestamp, so a record without ``last_seen`` never
+# displaces one that has it.
+_NEVER_SEEN = datetime.min.replace(tzinfo=UTC)
+
+
+def _last_seen_sort_key(device: ProviderDevice) -> datetime:
+    """Return a timezone-aware ``last_seen`` suitable for comparison.
+
+    Naive timestamps are treated as UTC (matching :func:`is_device_recent`);
+    comparing a naive datetime with an aware one would raise ``TypeError`` and
+    take the whole provider out of the sync cycle.
+    """
+    last_seen = device.last_seen
+    if last_seen is None:
+        return _NEVER_SEEN
+    if last_seen.tzinfo is None:
+        return last_seen.replace(tzinfo=UTC)
+    return last_seen
 
 
 def is_device_recent(device: ProviderDevice, max_days: int) -> bool:
